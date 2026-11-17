@@ -71,7 +71,7 @@ only the 55,075 packages that ask for it by name.
 
 ### Named dependents
 
-Clicking a revealed rebuild count names a few of the packages it counts:
+A revealed rebuild count names a few of the packages it counts:
 "includes firefox, libreoffice, steam and 9,647 others". Each package
 carries the first three dependents in a preference order: the allow list
 one section at a time (a browser, then an editor, then a terminal, and
@@ -136,8 +136,10 @@ in a closure round. Five sizes (`hello`, `git`, `python3`, `firefox`,
 `glibc`) were checked against `nix path-info -S --store
 https://cache.nixos.org` and matched to the byte.
 
-Clicking a revealed closure size repeats the walk in the browser
-(`site/js/verify.js`): cache.nixos.org sends
+A revealed closure size links to the store path on
+`https://seenix.dev/?path=<path>`, and the page repeats the walk in the
+browser as soon as the size is shown (`site/js/verify.js`):
+cache.nixos.org sends
 `access-control-allow-origin: *`, so the page fetches the root narinfo,
 follows `References` breadth-first with eight requests in flight, and
 compares the sum. `tests/site/live.test.mjs` runs the same code against

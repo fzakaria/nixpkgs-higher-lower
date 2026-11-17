@@ -1,17 +1,19 @@
-// The revealed number on a card, which is also how to check it. Every
-// kind of round writes its number the same way, dotted underline and
-// clickable, and a muted note under it takes what the click finds:
+// The revealed number on a card, which is also how to check it. A number
+// with a page behind it is a link with a dotted underline, and a muted
+// note under it says what the page found on its own:
 //
-//   versions, first seen   a link to the package on nixmultiverse.com
-//   closure size           a live walk of cache.nixos.org, its result in
-//                          the note
-//   rebuilds               the note names a few dependents
+//   versions, first seen   links to the package on nixmultiverse.com
+//   closure size           links to the store path on seenix; the note
+//                          is a live walk of cache.nixos.org, run on
+//                          reveal
+//   rebuilds               plain, since no site lists a derivation's
+//                          reverse closure; the note names a few
+//                          dependents
 //
-// A number with nothing behind it (no dependents, no cached closure) is
-// plain text.
+// A closure the cache does not have is plain text with no note.
 
 import { formatCount, formatDependents, formatLiveResult, formatStat } from "./format.js";
-import { multiverseUrl, walkClosure } from "./verify.js";
+import { multiverseUrl, seenixUrl, walkClosure } from "./verify.js";
 
 // A small element builder: text only, never HTML, since descriptions and
 // names come from nixpkgs.
@@ -30,31 +32,41 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
-// The number as a button that runs `onClick` with the note element.
-function button(text, note, onClick) {
-  const node = el("button", { type: "button", class: "answer" }, text);
-  node.addEventListener("click", () => onClick(node, note));
-  return node;
+// Each reveal's number, so a walk still running when the player moves
+// on never writes into the next round's note.
+let reveals = 0;
+
+// Clear a card's number and note, and orphan any walk still writing.
+export function clearAnswer(stat, note) {
+  note.dataset.reveal = String(++reveals);
+  stat.replaceChildren();
+  note.className = "note muted";
+  note.textContent = "";
 }
 
-// Walk the closure from the browser and put the result in the note.
-async function checkLive(p, node, note) {
-  node.disabled = true;
-  note.className = "note muted";
-  note.textContent = "walking cache.nixos.org…";
+// Walk the closure from the browser and put the result in the note, for
+// as long as the note still belongs to this reveal.
+async function checkLive(p, note) {
+  const reveal = note.dataset.reveal;
+  const write = (className, text) => {
+    if (note.dataset.reveal !== reveal) {
+      return;
+    }
+    note.className = className;
+    note.textContent = text;
+  };
+
+  write("note muted", "walking cache.nixos.org…");
   try {
     const result = await walkClosure(p.out, undefined, {
       onProgress: ({ paths }) => {
-        note.textContent = `walking cache.nixos.org: ${formatCount(paths)} paths so far`;
+        write("note muted", `walking cache.nixos.org: ${formatCount(paths)} paths so far`);
       },
     });
-    note.className = result.bytes === p.closureSize ? "note right" : "note wrong";
-    note.textContent = formatLiveResult(result, p.closureSize);
+    const same = result.bytes === p.closureSize;
+    write(same ? "note right" : "note wrong", formatLiveResult(result, p.closureSize));
   } catch (e) {
-    note.className = "note error";
-    note.textContent = `could not check: ${e.message}`;
-  } finally {
-    node.disabled = false;
+    write("note error", `could not check: ${e.message}`);
   }
 }
 
@@ -62,8 +74,7 @@ async function checkLive(p, node, note) {
 // `note` for what a click finds.
 export function showAnswer(type, p, stat, note) {
   const text = formatStat(type, p);
-  note.className = "note muted";
-  note.textContent = "";
+  clearAnswer(stat, note);
 
   // Versions and first-seen dates: the package's history.
   if (type === "versions" || type === "firstSeen") {
@@ -71,25 +82,19 @@ export function showAnswer(type, p, stat, note) {
     return;
   }
 
-  // Closure sizes: the live walk, when the cache had the closure.
+  // Closure sizes: the store path on seenix, and the live walk, when the
+  // cache had the closure.
   if (type === "closureSize") {
     if (p.closureSize === null) {
       stat.replaceChildren(text);
       return;
     }
-    stat.replaceChildren(button(text, note, (node) => checkLive(p, node, note)));
+    stat.replaceChildren(el("a", { class: "answer", href: seenixUrl(p.out) }, text));
+    checkLive(p, note);
     return;
   }
 
-  // Rebuild counts: a few named dependents, shown and hidden by the click.
-  const dependents = formatDependents(p.dependents, p.rebuilds);
-  if (dependents === null) {
-    stat.replaceChildren(text);
-    return;
-  }
-  stat.replaceChildren(
-    button(text, note, () => {
-      note.textContent = note.textContent ? "" : dependents;
-    }),
-  );
+  // Rebuild counts: plain, with a few named dependents under them.
+  stat.replaceChildren(text);
+  note.textContent = formatDependents(p.dependents, p.rebuilds) ?? "";
 }

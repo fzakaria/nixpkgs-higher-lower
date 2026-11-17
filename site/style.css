@@ -202,24 +202,16 @@ button {
   overflow-wrap: anywhere;
 }
 
-/* The revealed number: the same dotted underline on every kind of round,
-   whether it is a link or a button. */
+/* A revealed number with a page behind it: the same dotted underline on
+   every kind of round. */
 .answer {
-  padding: 0;
-  background: none;
-  border: 0;
   color: inherit;
-  font: inherit;
   text-decoration: underline dotted;
   text-decoration-thickness: 2px;
   text-underline-offset: 0.2em;
-  cursor: pointer;
 }
 .answer:hover {
   text-decoration-style: solid;
-}
-.answer:disabled {
-  cursor: progress;
 }
 .note.right {
   color: var(--right);

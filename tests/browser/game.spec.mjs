@@ -1,5 +1,5 @@
 // Tests the built page in Chromium: what each kind of revealed number
-// links to or does when clicked, that navigating to a methods section
+// links to and what is shown under it, that navigating to a methods section
 // leaves the game alone, that the pool choice survives a reload, and
 // that a phone-width page never scrolls sideways. Rounds are random, so
 // each test answers rounds until the one it needs comes up.
@@ -24,6 +24,7 @@ const PHONE = { width: 390, height: 844 };
 const STORE = "/nix/store/";
 const NARINFO_ROUTE = "https://cache.nixos.org/*.narinfo";
 const MULTIVERSE_PKG_URL = "https://nixmultiverse.com/?pkg=";
+const SEENIX_PATH_URL = "https://seenix.dev/?path=";
 const NIXPKGS_COMMIT_URL = "https://github.com/NixOS/nixpkgs/commit/";
 const HTTP_NOT_FOUND = 404;
 
@@ -121,12 +122,15 @@ for (const type of ["versions", "firstSeen"]) {
   });
 }
 
-// Tests the inline live check on a closure number: with cache.nixos.org
-// answering each root with its recorded size and no references, the
-// line beside the number reports a match.
-test("a closure number checks itself against the cache", async ({ page }) => {
+// Tests a closure reveal: each number links to its store path on
+// seenix, and with cache.nixos.org answering each root with its recorded
+// size and no references, the live check runs without a click and the
+// line under each number reports a match.
+test("a closure number links to seenix and checks itself", async ({ page }) => {
+  const packages = commonPackages();
+  const outByAttr = new Map(packages.map((p) => [p.attr, p.out]));
   const sizeByHash = new Map(
-    commonPackages().map((p) => [p.out.slice(STORE.length).split("-", 1)[0], p.closureSize]),
+    packages.map((p) => [p.out.slice(STORE.length).split("-", 1)[0], p.closureSize]),
   );
   await page.route(NARINFO_ROUTE, (route) => {
     const hash = new URL(route.request().url()).pathname.slice(1).split(".", 1)[0];
@@ -139,12 +143,17 @@ test("a closure number checks itself against the cache", async ({ page }) => {
 
   await page.goto("/");
   await revealRound(page, "closureSize");
-  const card = page.locator(".card").first();
-  await card.locator(".stat button").click();
-  await expect(card.locator(".note")).toHaveText(/^cache\.nixos\.org: 1 path, .+, matches$/);
+  for (const card of await page.locator(".card").all()) {
+    const attr = await card.locator(".attr").textContent();
+    await expect(card.locator(".stat a")).toHaveAttribute(
+      "href",
+      SEENIX_PATH_URL + encodeURIComponent(outByAttr.get(attr)),
+    );
+    await expect(card.locator(".note")).toHaveText(/^cache\.nixos\.org: 1 path, .+, matches$/);
+  }
 });
 
-// Tests that a closure walk the cache cannot finish says so beside the
+// Tests that a live check the cache cannot finish says so under the
 // number rather than reporting a smaller total.
 test("a closure check reports a path the cache lacks", async ({ page }) => {
   await page.route(NARINFO_ROUTE, (route) =>
@@ -152,23 +161,23 @@ test("a closure check reports a path the cache lacks", async ({ page }) => {
   );
   await page.goto("/");
   await revealRound(page, "closureSize");
-  const card = page.locator(".card").first();
-  await card.locator(".stat button").click();
-  await expect(card.locator(".note")).toContainText("is not in https://cache.nixos.org");
+  await expect(page.locator(".card").first().locator(".note")).toContainText(
+    "is not in https://cache.nixos.org",
+  );
 });
 
-// Tests that a rebuild count with dependents opens a line naming some of
-// them, and that a count of zero is plain text.
-test("a rebuild number names some dependents", async ({ page }) => {
+// Tests that a rebuild count is plain text with a line naming some
+// dependents shown on reveal, and no line for a count of zero.
+test("a rebuild reveal names some dependents", async ({ page }) => {
   await page.goto("/");
   await revealRound(page, "rebuilds");
   for (const card of await page.locator(".card").all()) {
+    await expect(card.locator(".stat a, .stat button")).toHaveCount(0);
     const stat = await card.locator(".stat").textContent();
     if (stat.startsWith("0 ")) {
-      await expect(card.locator(".stat button")).toHaveCount(0);
+      await expect(card.locator(".note")).toBeEmpty();
       continue;
     }
-    await card.locator(".stat button").click();
     await expect(card.locator(".note")).toHaveText(/^includes \S/);
   }
 });

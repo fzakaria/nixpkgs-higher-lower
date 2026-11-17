@@ -88,14 +88,15 @@
         <strong>Rebuilds</strong>: nixpkgs was evaluated for x86_64-linux with
         <a href="https://github.com/nix-community/nix-eval-jobs">nix-eval-jobs</a>, covering what
         <code>nix-env -qa</code> lists. A package's count is how many of those packages have its
-        <code>.drv</code> in their build closure. Click a count to see a few of them.
+        <code>.drv</code> in their build closure. Each revealed count names a few of them.
         <a href="https://github.com/fzakaria/nixpkgs-higher-lower/blob/main/docs/data.md">docs/data.md</a>
         has the full method.
       </p>
       <p id="how-closure">
         <strong>Closure size</strong>: the sum of <code>NarSize</code> over the runtime closure of the
         package's default output on cache.nixos.org, which is what <code>nix path-info -S</code> prints.
-        Click a size to repeat the walk from the page.
+        The page repeats the walk when a size is revealed, and the size links to the closure on
+        seenix.
       </p>
       <p id="how-history">
         <strong>Versions and age</strong>: from

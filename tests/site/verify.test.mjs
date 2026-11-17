@@ -7,13 +7,23 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { multiverseUrl, narinfoUrl, parseNarinfo, walkClosure } from "../../site/js/verify.js";
+import {
+  multiverseUrl,
+  narinfoUrl,
+  parseNarinfo,
+  seenixUrl,
+  walkClosure,
+} from "../../site/js/verify.js";
 
 const LIBNDP = "/nix/store/97q15lk5c0c10miyawwbfir4rddifcqn-libndp-1.9";
 
-// Tests the two URLs a number leads to: the package on the multiverse
-// and a store path's narinfo on the cache.
-test("multiverse and narinfo URLs", () => {
+// Tests the URLs a number leads to: the package on the multiverse, the
+// store path on seenix, and a store path's narinfo on the cache.
+test("multiverse, seenix and narinfo URLs", () => {
+  assert.equal(
+    seenixUrl(LIBNDP),
+    "https://seenix.dev/?path=%2Fnix%2Fstore%2F97q15lk5c0c10miyawwbfir4rddifcqn-libndp-1.9",
+  );
   assert.equal(multiverseUrl("libndp"), "https://nixmultiverse.com/?pkg=libndp");
   assert.equal(
     multiverseUrl("python3Packages.foo"),

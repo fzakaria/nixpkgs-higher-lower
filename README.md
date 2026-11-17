@@ -11,11 +11,11 @@ shipped more versions, and which was packaged first. The game runs until
 the first wrong answer, on a common pool of 1,000 packages or on 9,000
 deep cuts.
 
-After each answer, each revealed number can be clicked to check it. A
-version count or first-seen date links to the package's history on
-nixmultiverse.com. A closure size re-walks the closure against
-cache.nixos.org from the page. A rebuild count names a few of the
-packages it counts.
+After each answer, each revealed number shows how to check it. A version
+count or first-seen date links to the package's history on
+nixmultiverse.com. A closure size links to the store path on seenix, and
+the page re-walks the closure against cache.nixos.org under it. A
+rebuild count names a few of the packages it counts.
 
 Everything is precomputed into JSON shipped with the page. Nothing runs
 on a server.
@@ -47,8 +47,8 @@ why the result is committed rather than built in CI.
 `site/` is the static page: vanilla ES modules, no bundler, no
 dependencies. `site/js/game.js` holds the rules (which pairs are fair,
 who wins) and `site/js/verify.js` the checks (the multiverse link, the
-live narinfo walk), neither touching the DOM. `site/js/answer.js` makes
-a revealed number clickable. `tools/rhl/` is
+live narinfo walk), neither touching the DOM. `site/js/answer.js` writes
+a revealed number and the line under it. `tools/rhl/` is
 the data pipeline in Python, and `tools/eval-drvs.sh` the evaluation it
 starts from. `data/game.json` and `data/deep.json` are the pipeline's
 output. `nix/` holds the

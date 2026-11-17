@@ -4,7 +4,7 @@
 // picked, and the choice is remembered.
 
 import { loadData, loadDeep } from "./data.js";
-import { showAnswer } from "./answer.js";
+import { clearAnswer, showAnswer } from "./answer.js";
 import { formatCount } from "./format.js";
 import { QUESTIONS, drawPair, randomType, winner } from "./game.js";
 
@@ -68,8 +68,7 @@ function fillCard(card, p) {
   card.querySelector(".attr").textContent = p.attr;
   card.querySelector(".version").textContent = p.version ?? "";
   card.querySelector(".desc").textContent = p.description ?? "";
-  card.querySelector(".stat").replaceChildren();
-  card.querySelector(".note").textContent = "";
+  clearAnswer(card.querySelector(".stat"), card.querySelector(".note"));
   card.classList.remove("right", "wrong", "higher");
   card.querySelector(".pick").disabled = false;
 }
@@ -93,7 +92,7 @@ function pick(side) {
   const answer = winner(round.type, round.a, round.b);
   const right = side === answer;
 
-  // Both numbers, each clickable to check it, the higher card outlined
+  // Both numbers, each with how to check it, the higher card outlined
   // and the picked card coloured.
   const cards = document.querySelectorAll(".card");
   [round.a, round.b].forEach((p, i) => {

@@ -1,11 +1,13 @@
 // Checking a revealed number: the multiverse page behind a version count
-// or a first-seen date, and for closure sizes a walk of cache.nixos.org's
-// narinfos run in the browser. cache.nixos.org answers with
+// or a first-seen date, and for closure sizes the store path on seenix
+// and a walk of cache.nixos.org's narinfos run in the browser. cache.nixos.org answers with
 // `access-control-allow-origin: *`, so a static page can fetch them.
 
 export const CACHE_URL = "https://cache.nixos.org";
 
 const STORE = "/nix/store/";
+
+const SEENIX_URL = "https://seenix.dev/";
 
 // How many narinfo requests the live walk keeps in flight.
 export const WALK_CONCURRENCY = 8;
@@ -14,6 +16,11 @@ const HTTP_NOT_FOUND = 404;
 
 export function multiverseUrl(attr) {
   return `https://nixmultiverse.com/?pkg=${encodeURIComponent(attr)}`;
+}
+
+// seenix draws a store path's closure from its `path` query parameter.
+export function seenixUrl(out) {
+  return `${SEENIX_URL}?path=${encodeURIComponent(out)}`;
 }
 
 export function narinfoUrl(path) {
