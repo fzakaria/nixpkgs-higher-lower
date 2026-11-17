@@ -1,22 +1,12 @@
-// Tests for site/js/game.js, the game's rules with no DOM: the seeded
-// random numbers, which pairs are fair to ask, who wins, the daily draw
-// and the share line. Packages are small literals shaped like
-// data/game.json's entries.
+// Tests for site/js/game.js, the game's rules with no DOM: which pairs
+// are fair to ask, who wins, and the draw of pairs and questions.
+// Packages are small literals shaped like data/game.json's entries.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import {
-  QUESTIONS,
-  dailyNumber,
-  dailyRounds,
-  drawPair,
-  fair,
-  hashString,
-  mulberry32,
-  shareText,
-  winner,
-} from "../../site/js/game.js";
+import { QUESTIONS, ROUND_MIX, drawPair, fair, randomType, winner } from "../../site/js/game.js";
+import { seeded } from "./random.mjs";
 
 function pkg(attr, fields = {}) {
   return {
@@ -28,28 +18,6 @@ function pkg(attr, fields = {}) {
     ...fields,
   };
 }
-
-// Tests hashString against FNV-1a's published 32-bit test vectors.
-test("hashString is 32-bit FNV-1a", () => {
-  assert.equal(hashString(""), 0x811c9dc5);
-  assert.equal(hashString("a"), 0xe40c292c);
-  assert.equal(hashString("foobar"), 0xbf9cf968);
-});
-
-// Tests that one seed always gives one sequence, inside [0, 1), and that
-// two seeds give two different ones.
-test("mulberry32 is deterministic and in range", () => {
-  const a = mulberry32(42);
-  const b = mulberry32(42);
-  const c = mulberry32(43);
-  const xs = Array.from({ length: 1000 }, () => a());
-  assert.deepEqual(
-    xs,
-    Array.from({ length: 1000 }, () => b()),
-  );
-  assert.ok(xs.every((x) => x >= 0 && x < 1));
-  assert.notEqual(xs[0], c());
-});
 
 // Tests the fairness rules one question at a time with pairs that sit
 // either side of each bound.
@@ -111,7 +79,7 @@ const POOL = Array.from({ length: 60 }, (_, i) =>
 // Tests that a drawn pair is fair, two distinct packages, and avoids the
 // excluded names, and that an impossible draw returns null.
 test("drawPair draws fair pairs and honours the exclusions", () => {
-  const random = mulberry32(7);
+  const random = seeded(7);
   const exclude = new Set(["p0", "p1", "p2"]);
   for (const type of Object.keys(QUESTIONS)) {
     for (let i = 0; i < 50; i++) {
@@ -127,40 +95,19 @@ test("drawPair draws fair pairs and honours the exclusions", () => {
   assert.equal(drawPair(twins, "versions", random), null);
 });
 
-// Tests the daily game: one date always gives the same ten rounds, with
-// the fixed mix of questions and no package twice, and the next date
-// gives different rounds.
-test("dailyRounds is a pure function of the date", () => {
-  const today = dailyRounds(POOL, "2026-11-16");
-  assert.deepEqual(today, dailyRounds(POOL, "2026-11-16"));
-  assert.notDeepEqual(today, dailyRounds(POOL, "2026-11-17"));
-  assert.equal(today.length, 10);
-
-  const mix = {};
-  for (const round of today) {
-    mix[round.type] = (mix[round.type] ?? 0) + 1;
+// Tests that every question comes up, each about as often as its share
+// of ROUND_MIX.
+test("randomType follows the round mix", () => {
+  const random = seeded(3);
+  const draws = 10_000;
+  const seen = {};
+  for (let i = 0; i < draws; i++) {
+    const type = randomType(random);
+    seen[type] = (seen[type] ?? 0) + 1;
   }
-  assert.deepEqual(mix, { rebuilds: 4, closureSize: 2, versions: 2, firstSeen: 2 });
-
-  const attrs = today.flatMap((r) => [r.a.attr, r.b.attr]);
-  assert.equal(new Set(attrs).size, attrs.length);
-  for (const round of today) {
-    assert.ok(fair(round.type, round.a, round.b));
+  assert.deepEqual(Object.keys(seen).sort(), Object.keys(QUESTIONS).sort());
+  for (const type of Object.keys(QUESTIONS)) {
+    const share = ROUND_MIX.filter((t) => t === type).length / ROUND_MIX.length;
+    assert.ok(Math.abs(seen[type] / draws - share) < 0.02, `${type}: ${seen[type]}`);
   }
-});
-
-// Tests the puzzle number, counted from the first daily game.
-test("dailyNumber counts days from launch", () => {
-  assert.equal(dailyNumber("2026-11-16"), 1);
-  assert.equal(dailyNumber("2026-11-17"), 2);
-  assert.equal(dailyNumber("2027-11-16"), 366);
-});
-
-// Tests the share line, character for character.
-test("shareText is one plain line", () => {
-  const results = [true, true, false, true, true, true, false, true, true, true];
-  assert.equal(
-    shareText("2026-11-17", results, "https://example.org/rhl/"),
-    "Rebuild Higher or Lower #2 2026-11-17: 8/10 ++-+++-+++ https://example.org/rhl/",
-  );
 });

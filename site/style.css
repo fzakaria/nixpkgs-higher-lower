@@ -108,29 +108,23 @@ button {
   color: inherit;
 }
 
-/* The mode tabs, the same tabs as seenix's lanes, and the endless
-   game's tier tabs under them, smaller. */
+/* The pool tabs, the same tabs as seenix's lanes. */
 .tabs {
   display: flex;
   border-bottom: 1px solid var(--line);
   margin: 0.8rem 0;
 }
-.tabs a {
+.tabs button {
+  border: 0;
   border-bottom: 2px solid transparent;
+  background: none;
   padding: 0.4rem 0.8rem;
   color: var(--muted);
-  text-decoration: none;
+  cursor: pointer;
 }
-.tabs a.active {
+.tabs button[aria-pressed="true"] {
   border-bottom-color: var(--accent);
   color: var(--fg);
-}
-.tabs.small {
-  margin-top: -0.4rem;
-  font-size: 14px;
-}
-.tabs.small a {
-  padding: 0.3rem 0.8rem;
 }
 
 /* The two cards side by side, stacked on a phone. */
@@ -247,20 +241,12 @@ pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.cmd {
-  display: flex;
-  gap: 0.4rem;
-  align-items: flex-start;
+/* A command's code sits in its box, without the inline code chip. */
+pre code {
+  font: inherit;
+  background: none;
+  padding: 0;
 }
-.cmd pre {
-  flex: 1;
-  min-width: 0;
-}
-.proof .output {
-  margin-top: 0.3rem;
-  border-left: 2px solid var(--line);
-}
-.copy,
 .check {
   padding: 0.2rem 0.6rem;
   background: none;
@@ -269,7 +255,6 @@ pre {
   cursor: pointer;
   font-size: 13px;
 }
-.copy:hover,
 .check:hover:enabled {
   border-color: var(--accent);
 }
@@ -287,10 +272,6 @@ pre {
 .live.error {
   color: var(--wrong);
 }
-.recipe {
-  margin: 0.4rem 0;
-}
-
 #after {
   display: flex;
   align-items: center;
@@ -300,48 +281,19 @@ pre {
 #verdict {
   font-weight: 600;
 }
-#verdict.right,
-#recap .right {
+#verdict.right {
   color: var(--right);
 }
-#verdict.wrong,
-#recap .wrong {
+#verdict.wrong {
   color: var(--wrong);
 }
-#next,
-#copy {
+#next {
   padding: 0.4rem 1.2rem;
   background: var(--accent);
   color: var(--bg);
   border: 0;
   border-radius: 4px;
   cursor: pointer;
-}
-
-/* The end of a daily game. */
-#recap {
-  padding-left: 1.4rem;
-}
-#recap li {
-  margin: 0.2rem 0;
-}
-.share {
-  display: flex;
-  gap: 0.5rem;
-  align-items: stretch;
-}
-#share {
-  flex: 1;
-  min-width: 0;
-  font:
-    13px/1.5 ui-monospace,
-    monospace;
-  background: var(--code-bg);
-  color: var(--fg);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 0.4rem;
-  resize: none;
 }
 
 #help {
@@ -356,4 +308,20 @@ footer {
   border-top: 1px solid var(--line);
   padding-top: 0.6rem;
   font-size: 13px;
+  text-align: center;
+}
+footer p {
+  margin: 0.3rem 0;
+}
+
+/* A store path is a single token; keep it on one line and shrink it to
+   fit a phone. */
+#store code {
+  font-size: min(12px, 2.1vw);
+  white-space: nowrap;
+  background: none;
+  padding: 0;
+}
+#help p {
+  margin: 0.6rem 0;
 }

@@ -1,6 +1,6 @@
 // The game's rules, free of the DOM so node can test them: which
-// questions exist, which pairs are fair to ask, who wins, and how the
-// daily game draws the same ten rounds for everyone on the same date.
+// questions exist, how often each comes up, which pairs are fair to ask,
+// and who wins.
 
 // One entry per question. `field` is the package's key in game.json.
 // `ask` is the question as the page shows it. `min` and `max` bound how
@@ -36,9 +36,9 @@ export const QUESTIONS = {
   },
 };
 
-// The daily game: how many rounds of each question, before shuffling.
+// How often each question comes up: one entry per share of the draw.
 // Rebuilds is the headline stat, so it gets the most.
-export const DAILY_MIX = [
+export const ROUND_MIX = [
   "rebuilds",
   "rebuilds",
   "rebuilds",
@@ -51,41 +51,10 @@ export const DAILY_MIX = [
   "firstSeen",
 ];
 
-// The first daily game; puzzle numbers count from it.
-export const LAUNCH_DATE = "2026-11-16";
-
 // How many times drawPair tries a first package before giving up.
 const DRAW_ATTEMPTS = 64;
 
 const DAY_MS = 86_400_000;
-
-// Characters in the share line for a right and a wrong answer.
-const RIGHT_MARK = "+";
-const WRONG_MARK = "-";
-
-// 32-bit FNV-1a of a string's UTF-16 code units. Seeds the daily draw
-// from the date.
-export function hashString(s) {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h >>> 0;
-}
-
-// mulberry32: a small seeded generator, the same sequence in every
-// browser, returning floats in [0, 1).
-export function mulberry32(seed) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 // Days since the Unix epoch for a YYYY-MM-DD date.
 function dayNumber(date) {
@@ -138,7 +107,8 @@ export function winner(type, a, b) {
 }
 
 // A fair pair for one question, in random order, drawn with `random`
-// from packages not in `exclude`. null if no fair pair turned up.
+// (any function returning floats in [0, 1), such as Math.random) from
+// packages not in `exclude`. null if no fair pair turned up.
 export function drawPair(packages, type, random, exclude = new Set()) {
   const eligible = packages.filter((p) => hasValue(type, p) && !exclude.has(p.attr));
   if (eligible.length < 2) {
@@ -157,50 +127,7 @@ export function drawPair(packages, type, random, exclude = new Set()) {
   return null;
 }
 
-// Fisher-Yates with the given generator, on a copy.
-function shuffle(items, random) {
-  const out = items.slice();
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
-}
-
-// The daily game for a YYYY-MM-DD date: DAILY_MIX shuffled, one pair per
-// question, no package twice. The seed is the date alone, so everyone
-// with the same data gets the same rounds.
-export function dailyRounds(packages, date) {
-  const random = mulberry32(hashString(`rebuild-higher-lower:${date}`));
-  const used = new Set();
-  const rounds = [];
-  for (const type of shuffle(DAILY_MIX, random)) {
-    const pair = drawPair(packages, type, random, used);
-    if (!pair) {
-      continue;
-    }
-    const [a, b] = pair;
-    used.add(a.attr);
-    used.add(b.attr);
-    rounds.push({ type, a, b });
-  }
-  return rounds;
-}
-
-// The puzzle number for a date: 1 on LAUNCH_DATE.
-export function dailyNumber(date) {
-  return dayNumber(date) - dayNumber(LAUNCH_DATE) + 1;
-}
-
-// The line a player copies after a daily game.
-export function shareText(date, results, url) {
-  const right = results.filter(Boolean).length;
-  const marks = results.map((r) => (r ? RIGHT_MARK : WRONG_MARK)).join("");
-  return `Rebuild Higher or Lower #${dailyNumber(date)} ${date}: ${right}/${results.length} ${marks} ${url}`;
-}
-
-// The endless game's question for its next round, weighted like the
-// daily mix.
+// The question for the next round, drawn with `random` from ROUND_MIX.
 export function randomType(random) {
-  return DAILY_MIX[Math.floor(random() * DAILY_MIX.length)];
+  return ROUND_MIX[Math.floor(random() * ROUND_MIX.length)];
 }

@@ -92,20 +92,22 @@ def reverse_closure_counts(graph, universe, targets, chunk=DEFAULT_CHUNK):
     return counts
 
 
-def reverse_closures(graph, universe, targets, chunk=DEFAULT_CHUNK):
-    """({target: count}, {target: first dependent or None}).
+def reverse_closures(
+    graph, universe, targets, chunk=DEFAULT_CHUNK, examples=1, block=COUNT_ROWS
+):
+    """({target: count}, {target: [first dependents]}).
 
     The count is how many members of `universe` (not counting the target
     itself) reach the target through `graph`; paths may pass through nodes
-    outside the universe. The first dependent is the earliest member, in
-    `universe` order, that does: callers order the universe by how well
-    known each member is, and get a witness people recognise.
+    outside the universe. The first dependents are the earliest `examples`
+    members, in `universe` order, that do: callers order the universe by
+    how well known each member is, and get names people recognise.
 
     Each node gets one integer used as a bitset over a chunk of targets: a
     node's bits are its own target bit OR its inputs' bits, filled in
     post-order. A universe member's bits are then exactly the targets in its
     closure, the counts are column sums of those rows, and the first
-    dependent is the first row with the column's bit set."""
+    dependents are the first rows with the column's bit set."""
     order = postorder(graph)
     index = {node: i for i, node in enumerate(order)}
     inputs = [[index[d] for d in graph.get(node, ())] for node in order]
@@ -131,28 +133,33 @@ def reverse_closures(graph, universe, targets, chunk=DEFAULT_CHUNK):
 
         # A member is not its own dependent: clear its own bit.
         rows = [bits[m] & ~own[m] for m in members]
-        sums, first_rows = column_stats(rows, len(part))
+        sums, first_rows = column_stats(rows, len(part), examples, block)
         for bit, target in enumerate(part):
             counts[target] = int(sums[bit])
-            row = int(first_rows[bit])
-            firsts[target] = universe[row] if row >= 0 else None
+            firsts[target] = [universe[row] for row in first_rows[bit]]
     return counts, firsts
 
 
-def column_stats(rows, width):
+def column_stats(rows, width, examples=1, block=COUNT_ROWS):
     """For bits 0..width-1 of the integers in `rows`: how many rows have
-    each bit set, and the index of the first row that does (-1 if none)."""
+    each bit set, and the indexes of the first `examples` rows that do,
+    one list per bit. Rows are unpacked `block` at a time."""
     nbytes = (width + 7) // 8
     sums = numpy.zeros(nbytes * 8, dtype=numpy.int64)
-    first = numpy.full(nbytes * 8, -1, dtype=numpy.int64)
-    for start in range(0, len(rows), COUNT_ROWS):
-        block = rows[start : start + COUNT_ROWS]
-        raw = b"".join(r.to_bytes(nbytes, "little") for r in block)
-        matrix = numpy.frombuffer(raw, dtype=numpy.uint8).reshape(len(block), nbytes)
+    firsts = [[] for _ in range(width)]
+    for start in range(0, len(rows), block):
+        part = rows[start : start + block]
+        raw = b"".join(r.to_bytes(nbytes, "little") for r in part)
+        matrix = numpy.frombuffer(raw, dtype=numpy.uint8).reshape(len(part), nbytes)
         bits = numpy.unpackbits(matrix, axis=1, bitorder="little")
         sums += bits.sum(axis=0, dtype=numpy.int64)
 
-        # Columns still without a first row take this block's first hit.
-        hit = bits.any(axis=0) & (first < 0)
-        first[hit] = start + bits.argmax(axis=0)[hit]
-    return sums[:width], first[:width]
+        # Columns still short of examples take this block's first hits.
+        hit = bits[:, :width].any(axis=0)
+        for column in numpy.flatnonzero(hit):
+            wanted = examples - len(firsts[column])
+            if wanted <= 0:
+                continue
+            found = numpy.flatnonzero(bits[:, column])[:wanted]
+            firsts[column].extend(start + int(row) for row in found)
+    return sums[:width], firsts

@@ -4,12 +4,11 @@ Everything the page knows is in two files written by
 `nix run .#update-data` from two pinned inputs, nixpkgs and
 nixpkgs-multiverse, both in `flake.lock`:
 
-- `data/game.json`: the common pool of 1,000 packages, which the daily
-  game and Endless' first tier draw from, and the provenance the footer
-  shows (both revisions, the graph's size, the tier sizes). 298 KB, 83 KB
-  gzipped.
-- `data/deep.json`: the other 9,000 packages of the deep-cuts tier,
-  fetched only when a player picks it. 2.7 MB, 779 KB gzipped.
+- `data/game.json`: the common pool of 1,000 packages, and the
+  provenance the footer shows (both revisions, the graph's size, the tier
+  sizes). 298 KB, 83 KB gzipped.
+- `data/deep.json`: the 9,000 packages of the deep-cuts pool, fetched
+  only when a player picks it. 2.7 MB, 779 KB gzipped.
 
 Each package carries its store path, its four stats, and a witness for
 its rebuild count, so the page can show how to check every number it
@@ -48,9 +47,22 @@ Checks made against the result: an independent reverse breadth-first
 search from six packages (`python3`, `hello`, `firefox`, `openssl`,
 `cmake`, `vim`) gave the same six counts, and the three packages counted
 as depending on `firefox` each have firefox's `.drv` in `nix-store -qR` of
-their own. The by-hand recipe on the page's "How the numbers were
-measured" (one `nix-store -qR` per evaluated package) has not been run end
-to end.
+their own.
+
+The whole count can be redone by hand, slowly, with one `nix-store -qR`
+per evaluated package. This recipe has not been run end to end:
+
+```sh
+rev=6dadaf4375be35033e1c84395adbd53ff5fded96
+src=$(nix flake prefetch --json "github:NixOS/nixpkgs/$rev" | jq -r .storePath)
+nix-eval-jobs --workers 4 --max-memory-size 3072 --expr \
+  "import $src { system = \"x86_64-linux\"; config.allowUnfree = true; }" > eval.jsonl
+jq -r '.drvPath // empty' eval.jsonl | sort -u > drvs.txt
+target=$(nix eval --raw "github:NixOS/nixpkgs/$rev#libndp.drvPath")
+while read -r drv; do
+  [ "$drv" != "$target" ] && nix-store -qR "$drv" | grep -qxF "$target" && echo "$drv"
+done < drvs.txt | wc -l
+```
 
 The count belongs to the attribute. `gcc` is the wrapped compiler stdenv
 uses, so almost everything counts it. stdenv's shell is
@@ -64,11 +76,11 @@ depends on it, and the page shows
 `nix why-depends --derivation github:NixOS/nixpkgs/<rev>#<witness> github:NixOS/nixpkgs/<rev>#<attr>`.
 The witness is the first dependent in a preference order: the allow list
 in file order (browsers first, so `firefox` is the witness for 568 of the
-common pool), then the common pool and the deep tier in rank order, then
-everything else evaluated. The preferred ones are limited to packages
-cache.nixos.org has, which means Hydra built them: they are free, so the
-nixpkgs flake evaluates them without `allowUnfree`. The same bitset pass
-finds the first set row per column.
+common pool), then the common pool and the deep-cuts pool in rank
+order, then everything else evaluated. The preferred ones are limited to
+packages cache.nixos.org has, which means Hydra built them: they are
+free, so the nixpkgs flake evaluates them without `allowUnfree`. The same
+bitset pass finds the first set row per column.
 
 The `.drv` paths match: `nix why-depends` on the flake printed the same
 `libndp` and `vscodium` derivations the evaluation produced, and the chain
@@ -90,11 +102,12 @@ always in; 191 of the 1,000 come from it. `data/pool-deny.txt` removes
 what the name rules miss, with a reason for each group. The pipeline logs
 allow-listed names that did not evaluate.
 
-The deep-cuts tier adds the next 9,000 by the same rules. Only 5,057 of
+The deep-cuts pool is the next 9,000 by the same rules, without the
+common pool. Only 5,057 of
 the 22,834 candidates that pass the filters have any dependents, so past
 that point rebuild count says nothing, and the tail is ranked by how many
 versions nixpkgs has shipped: a package updated 38 times outranks a
-one-off. The tier ends at packages with 9 versions.
+one-off. The pool ends at packages with 9 versions.
 
 ## Versions and first-seen dates
 
@@ -111,11 +124,10 @@ three-year window, and anything present at the first bump has no lower
 bound. The game only asks which came first when the two windows do not
 overlap and are at least 180 days apart.
 
-The page links each package to `https://nixmultiverse.com/?pkg=<attr>`
-and shows `mvs query versions <attr>` pinned to the same multiverse
-revision, with the start of the line it prints. For `yq` and `softhsm`
-the pinned `mvs` printed `yq · 23 versions · 2017-11-30 ..` and
-`softhsm · 7 versions · 2016-09-24 ..`, matching the page.
+The page links each package to `https://nixmultiverse.com/?pkg=<attr>`.
+For `yq` and `softhsm`, `mvs query versions` at the pinned multiverse
+revision printed `yq · 23 versions · 2017-11-30 ..` and
+`softhsm · 7 versions · 2016-09-24 ..`, matching the data.
 
 ## Closure sizes
 
@@ -134,7 +146,7 @@ The page repeats the walk in the browser ("Check it live",
 `access-control-allow-origin: *`, so the page fetches the root narinfo,
 follows `References` breadth-first with eight requests in flight, and
 compares the sum. `tests/site/live.test.mjs` runs the same code against
-the real cache when `RHL_LIVE=1`:
+the real cache when `NHL_LIVE=1`:
 
 | package   | paths | bytes         | recorded      |
 | --------- | ----- | ------------- | ------------- |
@@ -148,11 +160,12 @@ the real cache when `RHL_LIVE=1`:
 must differ by a ratio of at least 1.2 (count + 1, so zero works) and at
 most 25 for rebuilds or 10 for sizes. Versions must differ by at least two
 and by a ratio of at most 5. First-seen windows must be between 180 days
-and ten years apart. The daily game seeds mulberry32 with an FNV-1a hash
-of the date and draws four rebuild rounds and two of each other question
-from the common pool, with no package twice. `tests/site/data.test.mjs`
-draws every daily game for two years from the committed file and checks
-each round against those rules.
+and ten years apart. Each round's question is drawn four times in ten
+for rebuilds and twice in ten for each of the others, and the last 40
+packages shown are kept out of the next draws.
+`tests/site/data.test.mjs` draws hundreds of pairs from each pool of the
+committed files, with those packages excluded, and checks every draw
+finds a pair.
 
 ## What it costs
 

@@ -1,6 +1,6 @@
 """Turn one nix-eval-jobs run plus the multiverse index into the game's
-data: data/game.json (the common pool, which the daily game uses) and
-data/deep.json (the rest of the deep-cuts pool, loaded on demand).
+data: data/game.json (the common pool) and data/deep.json (the deep-cuts
+pool, loaded on demand).
 
     python3 -m tools.rhl.build --eval .work/eval.jsonl --multiverse DIR ...
 
@@ -14,8 +14,8 @@ Steps, each logged with how long it took:
 4. join version counts and first-seen windows from the multiverse
 5. choose the two tiers (tools/rhl/pool.py)
 6. walk cache.nixos.org narinfos for each chosen package's runtime closure
-7. pick each chosen package's witness: the best-known package that has it
-   in its build closure, for the page's `nix why-depends` command
+7. name a few of each chosen package's dependents, best known first, for
+   the page to show under its rebuild count
 """
 
 import argparse
@@ -27,15 +27,18 @@ import time
 from . import closure, drvgraph, evaljobs, multiverse, pool
 
 # The schema of both data files; site/js/data.js refuses any other.
-SCHEMA = 2
+SCHEMA = 3
 
-# The common pool, which the daily game and Endless' first tier draw from,
-# and the size of the deep-cuts tier, which contains the common pool.
+# The size of the common pool, and of the common and deep-cuts pools
+# together.
 COMMON_SIZE = 1000
 DEEP_SIZE = 10000
 
 # Long descriptions are cut to fit a card.
 DESCRIPTION_LIMIT = 140
+
+# How many dependents each package names.
+DEPENDENT_EXAMPLES = 3
 
 # Reading .drv files is I/O and syscalls; threads overlap them.
 READ_THREADS = 16
@@ -74,7 +77,7 @@ def short(text):
     return text[: DESCRIPTION_LIMIT - 1].rstrip() + "…"
 
 
-def witness_order(records, names, preferred):
+def dependent_order(records, names, preferred):
     """Every universe derivation, best-known first: the drvs in
     `preferred`, then the rest by the length of their shortest attribute,
     so a top-level package comes before a nested one. Returns the order
@@ -120,7 +123,8 @@ def main(argv=None):
     # 3. Rebuild counts for every top-level package, named canonically,
     # where an allowed name beats the other spellings of its derivation.
     with open(args.allow) as f:
-        allow = pool.read_list(f.read())
+        allow_text = f.read()
+    allow = pool.read_list(allow_text)
     with open(args.deny) as f:
         deny = set(pool.read_list(f.read()))
     names = pool.canonical_attrs(records, prefer=set(allow))
@@ -175,27 +179,27 @@ def main(argv=None):
         json.dump(info, f)
     log(f"{len(info)} narinfos known")
 
-    # 7. Witnesses. Preferred are packages Hydra built (in the cache, so
-    # free and buildable, which `nix why-depends` on the nixpkgs flake
-    # needs): the allow list in file order, then the common pool, then
-    # the deep tier, each in rank order.
+    # 7. Dependents to name. Preferred are the allow list, one section at
+    # a time so the names are not all browsers, then the common pool, then
+    # the deep-cuts pool, each in rank order.
     drv_of = {c["attr"]: c["drvPath"] for c in candidates}
-    built = {c["attr"] for c in chosen if size_of[c["out"]] is not None}
-    ranked = [a for a in allow if a in common_attrs] + [c["attr"] for c in chosen]
-    preferred = [drv_of[a] for a in dict.fromkeys(ranked) if a in built]
-    order, label = witness_order(records, names, preferred)
-    with step("pick witnesses"):
-        _, firsts = drvgraph.reverse_closures(graph, order, [c["drvPath"] for c in chosen])
+    ranked = [a for a in pool.interleave_sections(allow_text) if a in common_attrs]
+    ranked += [c["attr"] for c in chosen]
+    preferred = [drv_of[a] for a in dict.fromkeys(ranked)]
+    order, label = dependent_order(records, names, preferred)
+    with step("name dependents"):
+        _, firsts = drvgraph.reverse_closures(
+            graph, order, [c["drvPath"] for c in chosen], examples=DEPENDENT_EXAMPLES
+        )
 
     def package(c):
-        witness = firsts[c["drvPath"]]
         return {
             "attr": c["attr"],
             "version": c["version"],
             "description": short(c["description"]),
             "out": c["out"],
             "rebuilds": c["rebuilds"],
-            "witness": label[witness] if witness else None,
+            "dependents": [label[d] for d in firsts[c["drvPath"]]],
             "closureSize": size_of[c["out"]],
             "versions": c["versions"],
             "firstSeen": c["firstSeen"],

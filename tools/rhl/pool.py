@@ -50,9 +50,7 @@ VERSIONED = re.compile(r"^(.*?[A-Za-z+-])_?([0-9][0-9_]*)$")
 
 def read_list(text):
     """The names in an allow or deny list, in file order: one per line,
-    `#` comments. The allow list's order is also the order witnesses are
-    preferred in, so the browsers at its top are the dependents shown
-    first."""
+    `#` comments."""
     names = {}
     for raw in text.splitlines():
         name = raw.split("#", 1)[0].strip()
@@ -60,6 +58,31 @@ def read_list(text):
             continue
         names[name] = None
     return list(names)
+
+
+def interleave_sections(text):
+    """The names in an allow list, one from each section in turn. A section
+    is the names after a comment line, up to the next one; the header's
+    comment lines make empty sections, which drop out. The page names a
+    package's first few dependents in this order, so they come from
+    several sections (a browser, an editor, a game) rather than one."""
+    sections = [[]]
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("#"):
+            sections.append([])
+            continue
+        name = line.split("#", 1)[0].strip()
+        if name:
+            sections[-1].append(name)
+
+    # Round robin: the first of every section, then the second, and so on.
+    order = {}
+    for i in range(max(len(s) for s in sections)):
+        for section in sections:
+            if i < len(section):
+                order[section[i]] = None
+    return list(order)
 
 
 def canonical_attrs(entries, prefer=frozenset()):

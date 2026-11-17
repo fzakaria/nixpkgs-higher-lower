@@ -17,14 +17,14 @@
 }:
 let
   python = import ./python.nix { inherit pkgs; };
-  tools = pkgs.runCommand "rhl-tools" { } ''
+  tools = pkgs.runCommand "nixpkgs-higher-lower-tools" { } ''
     mkdir -p $out
     cp -r ${../tools} $out/tools
   '';
   date = d: "${builtins.substring 0 4 d}-${builtins.substring 4 2 d}-${builtins.substring 6 2 d}";
 in
 pkgs.writeShellApplication {
-  name = "rhl-update-data";
+  name = "nixpkgs-higher-lower-update-data";
   runtimeInputs = [
     pkgs.nix-eval-jobs
     python
@@ -32,7 +32,7 @@ pkgs.writeShellApplication {
   ];
   text = ''
     if [ ! -f data/pool-allow.txt ]; then
-      echo "run this from the root of a rebuild-higher-lower checkout" >&2
+      echo "run this from the root of a nixpkgs-higher-lower checkout" >&2
       exit 2
     fi
 

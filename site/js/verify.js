@@ -1,15 +1,11 @@
-// Proof for a revealed number: the command that reproduces it, with the
-// output it prints, and for closure sizes a walk of cache.nixos.org's
-// narinfos run in the browser. cache.nixos.org answers with
-// `access-control-allow-origin: *`, so a static page can fetch them.
+// Proof for a revealed number: the command that reproduces it, and for
+// closure sizes a walk of cache.nixos.org's narinfos run in the browser.
+// cache.nixos.org answers with `access-control-allow-origin: *`, so a
+// static page can fetch them.
 
 export const CACHE_URL = "https://cache.nixos.org";
 
 const STORE = "/nix/store/";
-
-// `nix path-info -S` right-aligns the closure size in this many columns
-// after a tab.
-const PATH_INFO_SIZE_WIDTH = 11;
 
 // How many narinfo requests the live walk keeps in flight.
 export const WALK_CONCURRENCY = 8;
@@ -20,25 +16,9 @@ export function pathInfoCommand(out) {
   return `nix path-info -S --store ${CACHE_URL} ${out}`;
 }
 
-export function pathInfoOutput(out, size) {
-  return `${out}\t${String(size).padStart(PATH_INFO_SIZE_WIDTH)}`;
-}
-
 export function whyDependsCommand(rev, dependent, attr) {
   const flake = `github:NixOS/nixpkgs/${rev}`;
   return `nix why-depends --derivation ${flake}#${dependent} ${flake}#${attr}`;
-}
-
-export function mvsCommand(rev, attr) {
-  return `nix run github:fzakaria/nixpkgs-multiverse/${rev}#mvs -- query versions ${attr}`;
-}
-
-// The start of the first line `mvs query versions` prints. The line goes
-// on to the last date the attribute was seen, which this page does not
-// record.
-export function mvsHeader(attr, versions, first) {
-  const noun = versions === 1 ? "version" : "versions";
-  return `${attr} · ${versions} ${noun} · ${first} ..`;
 }
 
 export function multiverseUrl(attr) {

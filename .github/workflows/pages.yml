@@ -11,6 +11,7 @@ on:
     paths:
       - site/**
       - data/game.json
+      - data/deep.json
       - nix/**
       - flake.lock
       - .github/workflows/pages.yml

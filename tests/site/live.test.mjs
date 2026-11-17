@@ -1,9 +1,9 @@
 // Runs site/js/verify.js' closure walk against the real cache.nixos.org
 // and compares it with the closure size the pipeline recorded. Needs the
-// network, so it is skipped unless RHL_LIVE=1, and the flake's checks,
+// network, so it is skipped unless NHL_LIVE=1, and the flake's checks,
 // which run in the sandbox, never set it:
 //
-//   RHL_LIVE=1 node --test tests/site/live.test.mjs
+//   NHL_LIVE=1 node --test tests/site/live.test.mjs
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { fetchNarinfo, walkClosure } from "../../site/js/verify.js";
 
 const DATA = JSON.parse(readFileSync(new URL("../../data/game.json", import.meta.url)));
-const LIVE = process.env.RHL_LIVE === "1";
+const LIVE = process.env.NHL_LIVE === "1";
 
 // Packages to walk: the one the user checked by hand, and two larger ones.
 const ATTRS = ["libndp", "python3", "firefox"];

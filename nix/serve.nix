@@ -1,6 +1,6 @@
 # `nix run .#serve` — serve the built site on localhost, exactly the tree
 # pages deploys. no-store because store paths carry a 1970 mtime, and a
-# 304 would keep a previous build's modules forever. $RHL_SITE serves a
+# 304 would keep a previous build's modules forever. $NHL_SITE serves a
 # checkout's site/ directory instead, for iterating without a rebuild; it
 # then also answers game.json and deep.json from the checkout's data/.
 { pkgs, site }:
@@ -8,7 +8,7 @@ pkgs.writeShellScript "serve-site" ''
   exec ${pkgs.python3}/bin/python3 - "''${1:-8139}" <<'EOF'
   import http.server, os, sys, urllib.parse
 
-  SITE = os.environ.get("RHL_SITE") or "${site}"
+  SITE = os.environ.get("NHL_SITE") or "${site}"
   DATA = os.path.join(SITE, "..", "data")
 
   class Handler(http.server.SimpleHTTPRequestHandler):

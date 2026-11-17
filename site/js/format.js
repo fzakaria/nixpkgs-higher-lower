@@ -57,7 +57,7 @@ function formatWindow({ after, by }) {
 export function formatStat(type, p) {
   switch (type) {
     case "rebuilds":
-      return plural(p.rebuilds, "package");
+      return plural(p.rebuilds, "rebuild");
     case "closureSize":
       return formatBytes(p.closureSize);
     case "versions":
@@ -66,4 +66,33 @@ export function formatStat(type, p) {
       return formatWindow(p.firstSeen);
   }
   throw new Error(`unknown question ${type}`);
+}
+
+// The line under a revealed rebuild count: the dependents the data names,
+// then how many more there are. null when it names none.
+export function formatDependents(names, count) {
+  if (names.length === 0) {
+    return null;
+  }
+
+  // Every dependent named: a plain list, "a, b and c".
+  const rest = count - names.length;
+  if (rest <= 0) {
+    const list =
+      names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+    return `includes ${list}`;
+  }
+
+  // Some named: the names, then the rest as a count.
+  return `includes ${names.join(", ")} and ${formatCount(rest)} other${rest === 1 ? "" : "s"}`;
+}
+
+// The line beside a closure size once the live walk of cache.nixos.org
+// finishes: what the cache has now, and whether it matches the data.
+export function formatLiveResult({ paths, bytes }, recorded) {
+  const head = `cache.nixos.org: ${plural(paths, "path")}`;
+  if (bytes === recorded) {
+    return `${head}, ${formatBytes(bytes)}, matches`;
+  }
+  return `${head}, ${formatCount(bytes)} bytes, recorded ${formatCount(recorded)}`;
 }

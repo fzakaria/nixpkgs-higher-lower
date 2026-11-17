@@ -109,17 +109,35 @@ class ReverseClosureCountsTest(unittest.TestCase):
                 whole,
             )
 
-    def test_first_dependent_follows_universe_order(self):
-        # reverse_closures also names, per target, the first universe
-        # member (in the order given) that depends on it, never the target
-        # itself, and None when nothing does. With app3 listed first it is
-        # libc's and lib2's witness; lib1's only dependent is app1.
+    def test_first_dependents_follow_universe_order(self):
+        # reverse_closures also names, per target, the first `examples`
+        # universe members (in the order given) that depend on it, never
+        # the target itself, and an empty list when nothing does. With
+        # app3 listed first it leads libc's and lib2's examples; lib1's
+        # only dependent is app1. Chunks of three must not change them.
         order = ["app3", "lib2", "app1", "app2", "lib1"]
-        counts, first = drvgraph.reverse_closures(
-            self.GRAPH, order, ["libc", "lib2", "lib1", "app3"], chunk=3
+        counts, examples = drvgraph.reverse_closures(
+            self.GRAPH, order, ["libc", "lib2", "lib1", "app3"], chunk=3, examples=2
         )
         self.assertEqual(counts, {"libc": 5, "lib2": 4, "lib1": 1, "app3": 0})
-        self.assertEqual(first, {"libc": "app3", "lib2": "app3", "lib1": "app1", "app3": None})
+        self.assertEqual(
+            examples,
+            {
+                "libc": ["app3", "lib2"],
+                "lib2": ["app3", "app1"],
+                "lib1": ["app1"],
+                "app3": [],
+            },
+        )
+
+    def test_examples_span_count_blocks(self):
+        # Rows are counted a block at a time; a target whose dependents
+        # sit in different blocks still gets them in universe order.
+        graph = {f"n{i}": ["lib"] for i in range(10)}
+        graph["lib"] = []
+        order = [f"n{i}" for i in range(10)]
+        _, examples = drvgraph.reverse_closures(graph, order, ["lib"], examples=4, block=3)
+        self.assertEqual(examples, {"lib": ["n0", "n1", "n2", "n3"]})
 
     def test_deep_chain_has_no_recursion_limit(self):
         # A 50,000-long chain: the topological walk must be iterative.

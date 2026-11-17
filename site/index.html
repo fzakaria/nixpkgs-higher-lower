@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Rebuild Higher or Lower</title>
+    <title>nixpkgs higher or lower</title>
     <meta
       name="description"
-      content="Higher or lower, played on nixpkgs: which package would rebuild more of it if it changed, which has the bigger closure, which shipped more versions, which came first."
+      content="Higher or lower, played on nixpkgs: which package would rebuild more of it, which has the bigger closure, which shipped more versions, which came first."
     />
     <link
       rel="icon"
@@ -15,45 +15,44 @@
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#16181d" media="(prefers-color-scheme: dark)" />
 
+    <link rel="canonical" href="https://fzakaria.github.io/nixpkgs-higher-lower/" />
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Rebuild Higher or Lower" />
-    <meta property="og:title" content="Rebuild Higher or Lower: which package would rebuild more of nixpkgs?" />
+    <meta property="og:url" content="https://fzakaria.github.io/nixpkgs-higher-lower/" />
+    <meta property="og:site_name" content="nixpkgs higher or lower" />
+    <meta property="og:title" content="nixpkgs higher or lower" />
     <meta
       property="og:description"
-      content="Two nixpkgs packages, one question. A daily game of ten rounds and an endless one, measured from the real build graph."
+      content="Two nixpkgs packages: pick the one with more rebuilds, the bigger closure, more versions, or the earlier start."
     />
 
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <header class="site">
-      <h1><a href=".">rebuild-higher-lower</a></h1>
+      <h1><a href=".">nixpkgs higher or lower</a></h1>
       <nav class="site">
         <a href="https://nixmultiverse.com/" title="every version of every package nixpkgs ever shipped">Multiverse</a>
         <a href="https://seenix.dev/" title="seenix: every byte of a Nix closure, one pixel each">See a closure</a>
         <a href="https://trynix.dev/" title="trynix: boot anything nixpkgs ever shipped, in your browser">Boot a package</a>
-        <a href="https://github.com/fzakaria/rebuild-higher-lower">GitHub</a>
+        <a href="https://github.com/fzakaria/nixpkgs-higher-lower">GitHub</a>
       </nav>
     </header>
 
     <p class="intro">
       <strong class="lede">Two nixpkgs packages. Pick the higher one.</strong>
-      Most rounds ask how much of nixpkgs would have to rebuild if the package changed: the number
-      of packages with it somewhere in their build graph. The rest ask about runtime closure size,
-      how many versions nixpkgs has shipped, and which was packaged first. After each answer, both
-      cards show their store path and a command that reproduces the number.
+      Rounds ask about rebuild count, closure size, version count or age, and run until your first
+      wrong answer. Each reveal shows how to check the number.
     </p>
 
-    <nav id="modes" class="tabs">
-      <a class="active" href="#daily" data-mode="daily">Daily</a>
-      <a href="#endless" data-mode="endless">Endless</a>
-    </nav>
-    <nav id="tiers" class="tabs small" hidden>
-      <a class="active" href="#endless" data-mode="endless">Common · <span class="tier-common"></span></a>
-      <a href="#deep" data-mode="deep">Deep cuts · <span class="tier-deep"></span></a>
+    <nav id="pools" class="tabs" aria-label="Pool">
+      <button type="button" data-pool="common" aria-pressed="true">
+        Common · <span class="tier-common"></span>
+      </button>
+      <button type="button" data-pool="deep" aria-pressed="false">
+        Deep cuts · <span class="tier-deep"></span>
+      </button>
     </nav>
 
-    <p id="pool-note" class="muted"></p>
     <p id="status" class="muted" aria-live="polite">Loading…</p>
 
     <section id="game" hidden>
@@ -82,87 +81,48 @@
       <div id="proofs" hidden></div>
     </section>
 
-    <section id="done" hidden>
-      <h2 id="score"></h2>
-      <ol id="recap"></ol>
-      <div class="share">
-        <textarea id="share" rows="2" readonly spellcheck="false"></textarea>
-        <button id="copy" type="button">Copy</button>
-      </div>
-      <p class="muted">Try the <a href="#endless">endless game</a> while you wait.</p>
-    </section>
-
     <details id="help">
       <summary>How the numbers were measured</summary>
-      <p>
-        <strong>Rebuilds</strong>: nixpkgs <code class="nixpkgs-rev"></code> was evaluated for
-        x86_64-linux with <a href="https://github.com/nix-community/nix-eval-jobs">nix-eval-jobs</a>,
-        which walks the same attributes as <code>nix-env -qa</code>, package sets such as
-        <code>python3Packages</code> included. Every input derivation of every <code>.drv</code> was
-        then followed through the store. A package's count is how many of the evaluated packages
-        (distinct derivations, so aliases count once) have its <code>.drv</code> anywhere in their
-        build closure. Change it, and each of those gets a new hash and has to be built again.
+      <p id="how-rebuilds">
+        <strong>Rebuilds</strong>: nixpkgs was evaluated for x86_64-linux with
+        <a href="https://github.com/nix-community/nix-eval-jobs">nix-eval-jobs</a>, covering what
+        <code>nix-env -qa</code> lists. A package's count is how many of those packages have its
+        <code>.drv</code> in their build closure. No command prints the count, so each reveal names one
+        dependent and the <code>nix why-depends</code> command that links them.
+        <a href="https://github.com/fzakaria/nixpkgs-higher-lower/blob/main/docs/data.md">docs/data.md</a>
+        has the full method.
       </p>
-      <p>
-        No single command prints that count, so each card names one of the packages it covers, with
-        the <code>nix why-depends --derivation</code> command that shows the chain between them. The
-        whole count can be redone by hand, slowly, with one <code>nix-store -qR</code> per evaluated
-        package:
-      </p>
-      <pre class="recipe">rev=<span class="nixpkgs-rev"></span>
-src=$(nix flake prefetch --json "github:NixOS/nixpkgs/$rev" | jq -r .storePath)
-nix-eval-jobs --workers 4 --max-memory-size 3072 --expr \
-  "import $src { system = \"x86_64-linux\"; config.allowUnfree = true; }" > eval.jsonl
-jq -r '.drvPath // empty' eval.jsonl | sort -u > drvs.txt
-target=$(nix eval --raw "github:NixOS/nixpkgs/$rev#libndp.drvPath")
-while read -r drv; do
-  [ "$drv" != "$target" ] &amp;&amp; nix-store -qR "$drv" | grep -qxF "$target" &amp;&amp; echo "$drv"
-done &lt; drvs.txt | wc -l</pre>
-      <p>
-        <a href="https://github.com/fzakaria/rebuild-higher-lower/blob/main/docs/data.md">docs/data.md</a>
-        explains how the pipeline does the same for every package at once.
-      </p>
-      <p>
-        The count is for the attribute itself. <code>gcc</code> is the wrapped compiler stdenv uses,
-        so nearly everything counts it. stdenv's shell is <code>bashNonInteractive</code>, so
-        <code>bash</code>, the interactive build, counts only the packages that ask for it by name.
-      </p>
-      <p>
+      <p id="how-closure">
         <strong>Closure size</strong>: the sum of <code>NarSize</code> over the runtime closure of the
-        package's default output, read from cache.nixos.org's narinfos, the number
-        <code>nix path-info -S</code> prints. "Check it live" repeats the walk from this page.
-        Packages the cache does not have, such as unfree ones, never come up in a closure round.
+        package's default output on cache.nixos.org, which is what <code>nix path-info -S</code> prints.
+        "Check it live" repeats the walk from the page.
       </p>
-      <p>
-        <strong>Versions</strong> and <strong>first seen</strong> come from
-        <a href="https://nixmultiverse.com/">nixpkgs-multiverse</a>, which records every version each
-        attribute had at each nixos-unstable channel bump since 2012. A version that came and went
-        between two bumps is not counted. The index has no revisions between October 2013 and
-        September 2016, so a package added then is only known to have arrived somewhere in that
-        window. Two packages are only compared when their windows are at least six months apart.
+      <p id="how-history">
+        <strong>Versions and age</strong>: from
+        <a href="https://nixmultiverse.com/">nixpkgs-multiverse</a>, which records every version at each
+        nixos-unstable channel bump since 2012. It has no bumps from October 2013 to September 2016, so
+        a package added then has a three-year window. Two packages are compared only when their windows
+        are six months apart or more.
       </p>
-      <p>
-        <strong>Pools</strong>: the common pool is the <span class="tier-common"></span> top-level
-        packages with the highest rebuild counts, build plumbing removed, plus a hand-kept list of
-        applications nothing depends on. The daily game draws only from it. Deep cuts is
-        <span class="tier-deep"></span> packages: the common pool, then the rest ranked by rebuild
-        count and, among the many with none, by how many versions nixpkgs has shipped.
-      </p>
-      <p>
-        Pairs are drawn so the answer is neither a coin flip nor a blowout. The daily game is drawn
-        from the date alone, so everyone playing on the same day gets the same ten rounds. Use
-        <kbd>1</kbd> and <kbd>2</kbd> or the arrow keys to pick, <kbd>Enter</kbd> to go on.
+      <p id="how-pools">
+        <strong>Pools</strong>: Common is the <span class="tier-common"></span> packages with the most
+        rebuilds, plus well-known applications. Deep cuts is the next
+        <span class="tier-deep"></span>, ranked by rebuilds and then by versions shipped. Pick with
+        <kbd>1</kbd> and <kbd>2</kbd> or the arrow keys, and go on with <kbd>Enter</kbd>.
       </p>
     </details>
 
     <footer class="muted">
       <p id="provenance"></p>
-      Made with ❤️ by
-      <a href="https://fzakaria.com">Farid Zakaria</a>
-      ·
-      <a href="https://github.com/fzakaria/rebuild-higher-lower/blob/main/LICENSE">MIT</a>
-      ·
-      <a href="https://github.com/fzakaria/rebuild-higher-lower">GitHub</a>
+      <p>
+        Made with ❤️ by
+        <a href="https://fzakaria.com">Farid Zakaria</a>
+        ·
+        <a href="https://github.com/fzakaria/nixpkgs-higher-lower/blob/main/LICENSE">MIT</a>
+        ·
+        <a href="https://github.com/fzakaria/nixpkgs-higher-lower">GitHub</a>
+      </p>
+      <p id="store" hidden><code id="store-path"></code></p>
     </footer>
 
     <script type="module" src="js/app.js"></script>

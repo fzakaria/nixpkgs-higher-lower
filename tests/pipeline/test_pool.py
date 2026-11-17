@@ -176,5 +176,23 @@ class ReadListTest(unittest.TestCase):
         self.assertEqual(pool.read_list(text), ["firefox", "vim"])
 
 
+class InterleaveSectionsTest(unittest.TestCase):
+    """interleave_sections reads an allow list's sections, each started by
+    a comment line, and takes one name from each section in turn, so the
+    first few names cover several kinds of package."""
+
+    def test_round_robin(self):
+        text = (
+            "# header\n#\n# more header\n"
+            "# browsers\nfirefox\nchromium\nlibrewolf\n"
+            "# editors\nemacs\nvim\n"
+            "# games\nsuperTux\n"
+        )
+        self.assertEqual(
+            pool.interleave_sections(text),
+            ["firefox", "emacs", "superTux", "chromium", "vim", "librewolf"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

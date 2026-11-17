@@ -1,5 +1,5 @@
 {
-  description = "Higher or lower, played on nixpkgs: which package would rebuild more of it?";
+  description = "nixpkgs higher or lower: rebuild counts, closure sizes, versions and age";
 
   # One nixpkgs, pinned to a revision rather than a branch, because it is
   # two things at once: the toolchain this flake builds with, and the tree
@@ -59,7 +59,7 @@
         {
           # serve the built site, exactly the tree pages deploys.
           # `nix run .#serve -- <port>` overrides the default 8139.
-          # $RHL_SITE serves a checkout's site/ directory instead, for
+          # $NHL_SITE serves a checkout's site/ directory instead, for
           # iterating without a rebuild (it needs data/game.json copied or
           # linked to site/game.json).
           serve = {
@@ -75,7 +75,7 @@
           # not in CI.
           update-data = {
             type = "app";
-            program = "${pipeline}/bin/rhl-update-data";
+            program = "${pipeline}/bin/nixpkgs-higher-lower-update-data";
           };
         }
       );
@@ -90,7 +90,7 @@
           # the pipeline's unit tests: drv parsing, the reverse closure
           # count, pool filtering, and joining the multiverse history
           pipeline =
-            pkgs.runCommand "rhl-pipeline-tests"
+            pkgs.runCommand "nixpkgs-higher-lower-pipeline-tests"
               { nativeBuildInputs = [ (import ./nix/python.nix { inherit pkgs; }) ]; }
               ''
                 cp -r ${./tools} tools
@@ -99,21 +99,23 @@
                 touch $out
               '';
 
-          # the game's unit tests (seeding, the daily draw, pair choice,
-          # scoring, the share line), and a pass over the committed data
-          # that the game can draw every daily round from it
-          site-tests = pkgs.runCommand "rhl-site-tests" { nativeBuildInputs = [ pkgs.nodejs ]; } ''
-            cp -r ${./site} site
-            cp -r ${./tests} tests
-            cp -r ${./data} data
-            cp ${./package.json} package.json
-            node --test tests/site/*.test.mjs
-            touch $out
-          '';
+          # the game's unit tests (pair choice, scoring, the proof
+          # commands, the narinfo walk), and a pass over the committed
+          # data that both pools keep drawing fair pairs
+          site-tests =
+            pkgs.runCommand "nixpkgs-higher-lower-site-tests" { nativeBuildInputs = [ pkgs.nodejs ]; }
+              ''
+                cp -r ${./site} site
+                cp -r ${./tests} tests
+                cp -r ${./data} data
+                cp ${./package.json} package.json
+                node --test tests/site/*.test.mjs
+                touch $out
+              '';
 
           # the site assembles: the entry page, the hashed module tree and
           # the data are where the build put them
-          site = pkgs.runCommand "rhl-site-check" { } ''
+          site = pkgs.runCommand "nixpkgs-higher-lower-site-check" { } ''
             test -f ${site}/index.html
             test -f ${site}/js.*/app.js
             test -f ${site}/game.*.json
@@ -122,6 +124,10 @@
             grep -q 'deep\.[0-9a-f]*\.json' ${site}/js.*/data.js
             touch $out
           '';
+
+          # the built page in Chromium: each kind of reveal, the methods
+          # link, the pool choice, and phone width
+          browser = import ./nix/browser-tests.nix { inherit pkgs site; };
         }
       );
 

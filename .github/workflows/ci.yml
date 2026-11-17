@@ -4,11 +4,12 @@
 #   checks.pipeline    — the data pipeline's unit tests: .drv parsing, the
 #                        reverse closure count, pool filtering, the
 #                        multiverse join, the narinfo walk
-#   checks.site-tests  — the game's unit tests, and the committed
-#                        data/game.json drawn through two years of daily
-#                        games
+#   checks.site-tests  — the game's unit tests, and the committed data
+#                        drawn from in both pools
 #   checks.site        — the deployable tree assembles: entry page, the
 #                        hashed module directory and data file in place
+#   checks.browser     — the built page in Chromium: each kind of reveal,
+#                        the methods link, the pool choice, phone width
 #
 # data/game.json is committed, not regenerated here; docs/data.md says why.
 name: ci

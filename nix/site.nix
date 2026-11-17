@@ -7,7 +7,7 @@
 #
 # No dependencies to vendor: the page is plain ES modules.
 { pkgs }:
-pkgs.runCommand "rebuild-higher-lower-site" { } ''
+pkgs.runCommand "nixpkgs-higher-lower-site" { } ''
   mkdir -p $out
   # The site directory and the data files alone, so a change to a test, a
   # tool or a doc does not rebuild the site.
@@ -25,6 +25,9 @@ pkgs.runCommand "rebuild-higher-lower-site" { } ''
     substituteInPlace $out/js/data.js \
       --replace-fail "\"$name.json\"" "\"$name.$sum.json\""
   done
+
+  # The footer names the store path serving the page.
+  substituteInPlace $out/js/app.js --replace-fail "__STORE_PATH__" "$out"
 
   # Hash the module tree and rename it js.<hash>, so the served HTML and
   # every module it imports can never be a mismatched pair across deploys.

@@ -2,9 +2,8 @@
 // game.<hash>.json and deep.<hash>.json and rewrites the URLs below to
 // match, so a deploy can never pair new code with a cached old data file.
 //
-// game.json is the common pool, which the daily game uses, plus the
-// provenance the footer shows. deep.json is the rest of the deep-cuts
-// tier, fetched only when a player picks it.
+// game.json is the common pool plus the provenance the footer shows.
+// deep.json is the deep-cuts pool, fetched only when a player picks it.
 
 export const SCHEMA = 2;
 

@@ -1,54 +1,49 @@
-// The page: three modes over the rules in game.js. The daily game is the
-// date's ten rounds from the common pool, resumable after a reload. The
-// endless game draws rounds until the first wrong answer and keeps the
-// best streak, from the common pool or from the deep-cuts tier, which is
-// loaded only when picked.
+// The page: one endless game over the rules in game.js, drawing rounds
+// until the first wrong answer and keeping the best streak. The player
+// picks the pool, common or deep cuts; deep cuts is loaded only when
+// picked, and the choice is remembered.
 
 import { loadData, loadDeep } from "./data.js";
-import { formatCount, formatStat, monthYear } from "./format.js";
-import {
-  QUESTIONS,
-  dailyNumber,
-  dailyRounds,
-  drawPair,
-  hashString,
-  mulberry32,
-  randomType,
-  shareText,
-  winner,
-} from "./game.js";
-import { copyText, proofPanel } from "./proof.js";
+import { formatCount, formatStat } from "./format.js";
+import { QUESTIONS, drawPair, randomType, winner } from "./game.js";
+import { proofPanel } from "./proof.js";
 
-// The deployed page, for the share line.
-const SITE_URL = "https://fzakaria.github.io/rebuild-higher-lower/";
-
-// The endless game keeps this many recent packages out of the next draws.
+// The game keeps this many recent packages out of the next draws.
 const RECENT_LIMIT = 40;
 
-// localStorage keys. The best streak is kept per endless tier.
-const DAILY_KEY = "rhl-daily";
-const BEST_KEY = { endless: "rhl-best", deep: "rhl-best-deep" };
+// The pools a player can draw from.
+const POOLS = { common: "common", deep: "deep" };
 
-const MODES = { daily: "daily", endless: "endless", deep: "deep" };
+// localStorage keys: the chosen pool, and the best streak per pool.
+const POOL_KEY = "nhl-pool";
+const BEST_KEY = { [POOLS.common]: "nhl-best-common", [POOLS.deep]: "nhl-best-deep" };
+
+// nix/site.nix replaces this with the store path of the site build. Left
+// as is when a checkout's site/ is served directly, and then not shown.
+const STORE_PATH = "__STORE_PATH__";
+const PLACEHOLDER_PREFIX = "__";
+
+const NIXPKGS_TREE_URL = "https://github.com/NixOS/nixpkgs/tree/";
+const MULTIVERSE_URL = "https://nixmultiverse.com/";
+
+// How many characters of the nixpkgs revision the footer shows.
+const SHORT_REV = 7;
 
 const $ = (id) => document.getElementById(id);
 
 let data = null;
 
-// The deep tier's packages, common pool included, once fetched.
+// The deep-cuts packages, once fetched.
 let deepPackages = null;
 
-let mode = MODES.daily;
+let pool = POOLS.common;
 
 // The round on screen: { type, a, b, picked } where picked is null until
 // the player answers.
 let round = null;
 
-// Daily progress: the date and one boolean per answered round.
-let daily = { date: null, rounds: [], results: [] };
-
-// Endless progress, for whichever tier is being played.
-let endless = { packages: [], random: null, recent: [], streak: 0, best: 0 };
+// The game in progress on the current pool.
+let game = { packages: [], recent: [], streak: 0, best: 0 };
 
 // localStorage, wrapped: private windows and blocked storage throw, and
 // the game must still work without it.
@@ -64,15 +59,8 @@ function save(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    // Progress is a convenience; losing it on reload is acceptable.
+    // The pool and the best streak are conveniences; losing them is fine.
   }
-}
-
-// Today in the player's own calendar, as YYYY-MM-DD.
-function today() {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 // Draw one card's static content: the name, version and description.
@@ -86,8 +74,7 @@ function fillCard(card, p) {
 }
 
 function showRound() {
-  const q = QUESTIONS[round.type];
-  $("question").textContent = q.ask;
+  $("question").textContent = QUESTIONS[round.type].ask;
   const cards = document.querySelectorAll(".card");
   fillCard(cards[0], round.a);
   fillCard(cards[1], round.b);
@@ -95,12 +82,11 @@ function showRound() {
   $("proofs").hidden = true;
   $("after").hidden = true;
   $("game").hidden = false;
-  $("done").hidden = true;
   cards[0].focus({ preventScroll: true });
 }
 
-// Reveal both numbers and their proofs, mark the answer, and record the
-// result.
+// Reveal both numbers and their proofs, mark the answer, and update the
+// streak.
 function pick(side) {
   if (!round || round.picked !== null) {
     return;
@@ -126,192 +112,119 @@ function pick(side) {
   );
   $("proofs").hidden = false;
 
-  if (mode === MODES.daily) {
-    daily.results.push(right);
-    save(DAILY_KEY, { date: daily.date, results: daily.results });
-    const last = daily.results.length === daily.rounds.length;
-    $("next").textContent = last ? "See the result" : "Next";
-  } else {
-    endless.streak = right ? endless.streak + 1 : 0;
-    endless.best = Math.max(endless.best, endless.streak);
-    save(BEST_KEY[mode], endless.best);
-    $("next").textContent = right ? "Next" : "Start again";
-  }
+  // The streak, kept per pool.
+  game.streak = right ? game.streak + 1 : 0;
+  game.best = Math.max(game.best, game.streak);
+  save(BEST_KEY[pool], game.best);
+  $("next").textContent = right ? "Next" : "Start again";
   showStatus();
   $("after").hidden = false;
   $("next").focus({ preventScroll: true });
 }
 
 function showStatus() {
-  if (mode === MODES.daily) {
-    const right = daily.results.filter(Boolean).length;
-    const n = Math.min(
-      daily.results.length + (round?.picked === null ? 1 : 0),
-      daily.rounds.length,
-    );
-    $("status").textContent =
-      `Daily #${dailyNumber(daily.date)} · round ${n} of ${daily.rounds.length} · ${right} right`;
-    return;
-  }
-  $("status").textContent = `Streak ${endless.streak} · best ${endless.best}`;
+  $("status").textContent = `Streak ${game.streak} · best ${game.best}`;
 }
 
-// What each mode draws from, in words, with the pool's size.
-function showPoolNote() {
-  const common = formatCount(data.tiers.common);
-  const deep = formatCount(data.tiers.deep);
-  const more = formatCount(data.tiers.deep - data.tiers.common);
-  const notes = {
-    daily: `Ten rounds from the common pool of ${common} packages, the same for everyone today.`,
-    endless: `Rounds from the common pool of ${common} packages until the first wrong answer.`,
-    deep:
-      `Rounds from ${deep} packages until the first wrong answer: the common pool and ` +
-      `${more} more, ranked by rebuild count and then by how many versions nixpkgs has shipped.`,
-  };
-  $("pool-note").textContent = notes[mode];
-}
-
-// The daily game: resume today's answers if any, else start at round one.
-function startDaily() {
-  const date = today();
-  const saved = load(DAILY_KEY);
-  daily = {
-    date,
-    rounds: dailyRounds(data.packages, date),
-    results: saved?.date === date && Array.isArray(saved.results) ? saved.results : [],
-  };
-  nextDaily();
-}
-
-function nextDaily() {
-  if (daily.results.length >= daily.rounds.length) {
-    round = null;
-    showDone();
-    return;
-  }
-  round = { ...daily.rounds[daily.results.length], picked: null };
-  showStatus();
-  showRound();
-}
-
-// The end of a daily game: the score, each round's line, the share text.
-function showDone() {
-  showStatus();
-  $("game").hidden = true;
-  $("done").hidden = false;
-  const right = daily.results.filter(Boolean).length;
-  $("score").textContent =
-    `${right} of ${daily.rounds.length} right. A new game starts at midnight.`;
-
-  const list = $("recap");
-  list.replaceChildren();
-  daily.rounds.forEach((r, i) => {
-    const li = document.createElement("li");
-    li.className = daily.results[i] ? "right" : "wrong";
-    const w = winner(r.type, r.a, r.b);
-    const [hi, lo] = w === 0 ? [r.a, r.b] : [r.b, r.a];
-    li.textContent = `${QUESTIONS[r.type].ask} ${hi.attr} (${formatStat(r.type, hi)}) over ${lo.attr} (${formatStat(r.type, lo)})`;
-    list.append(li);
-  });
-  $("share").value = shareText(daily.date, daily.results, SITE_URL);
-}
-
-// The endless game: seeded from the clock, so every run differs.
-function startEndless(packages) {
-  endless = {
+// A new game on `packages`, with the pool's best streak.
+function startGame(packages) {
+  game = {
     packages,
-    random: mulberry32(hashString(String(Date.now()))),
     recent: [],
     streak: 0,
-    best: Number(load(BEST_KEY[mode])) || 0,
+    best: Number(load(BEST_KEY[pool])) || 0,
   };
-  nextEndless();
+  next();
 }
 
-function nextEndless() {
+function next() {
   // A draw that finds no fair pair outside the recent packages forgets
   // them and draws again; tests/site/data.test.mjs shows the shipped data
   // never needs to.
-  const type = randomType(endless.random);
-  let pair = drawPair(endless.packages, type, endless.random, new Set(endless.recent));
+  const type = randomType(Math.random);
+  let pair = drawPair(game.packages, type, Math.random, new Set(game.recent));
   if (!pair) {
-    endless.recent = [];
-    pair = drawPair(endless.packages, type, endless.random);
+    game.recent = [];
+    pair = drawPair(game.packages, type, Math.random);
   }
   const [a, b] = pair;
-  endless.recent.push(a.attr, b.attr);
-  endless.recent = endless.recent.slice(-RECENT_LIMIT);
+  game.recent.push(a.attr, b.attr);
+  game.recent = game.recent.slice(-RECENT_LIMIT);
   round = { type, a, b, picked: null };
   showStatus();
   showRound();
 }
 
-function next() {
-  if (mode === MODES.daily) {
-    nextDaily();
-    return;
-  }
-  nextEndless();
-}
-
-// The deep tier, fetched once on first use.
+// The deep-cuts packages, fetched once on first use.
 async function deep() {
   if (!deepPackages) {
-    $("status").textContent = `Loading ${formatCount(data.tiers.deep)} packages…`;
-    const extra = await loadDeep(data);
-    deepPackages = [...data.packages, ...extra.packages];
+    $("status").textContent =
+      `Loading ${formatCount(data.tiers.deep - data.tiers.common)} packages…`;
+    deepPackages = (await loadDeep(data)).packages;
   }
   return deepPackages;
 }
 
-// Switch modes from the tabs or the URL hash.
-async function setMode(m) {
-  mode = Object.values(MODES).includes(m) ? m : MODES.daily;
-  const tab = mode === MODES.daily ? MODES.daily : MODES.endless;
-  for (const a of document.querySelectorAll("#modes a")) {
-    a.classList.toggle("active", a.dataset.mode === tab);
+// Switch pools from the buttons or the saved choice, and start a game.
+async function setPool(p) {
+  pool = Object.values(POOLS).includes(p) ? p : POOLS.common;
+  save(POOL_KEY, pool);
+  for (const button of document.querySelectorAll("#pools button")) {
+    button.setAttribute("aria-pressed", String(button.dataset.pool === pool));
   }
-  for (const a of document.querySelectorAll("#tiers a")) {
-    a.classList.toggle("active", a.dataset.mode === mode);
-  }
-  $("tiers").hidden = mode === MODES.daily;
-  showPoolNote();
   round = null;
 
-  if (mode === MODES.daily) {
-    startDaily();
+  // The common pool is in the data already loaded.
+  if (pool === POOLS.common) {
+    startGame(data.packages);
     return;
   }
-  if (mode === MODES.endless) {
-    startEndless(data.packages);
-    return;
-  }
+
+  // Deep cuts is a second fetch, which can fail on its own.
   try {
-    startEndless(await deep());
+    startGame(await deep());
   } catch (e) {
     $("status").textContent = `Could not load the deep-cuts data: ${e.message}`;
   }
 }
 
-// The footer's provenance line, and the revision and pool sizes the help
-// text names, from the data file itself.
+// Open the section the URL's fragment names, when it sits inside the
+// closed methods <details>, and scroll to it. The game is left alone.
+function showSection() {
+  const target = location.hash ? document.getElementById(location.hash.slice(1)) : null;
+  if (!target) {
+    return;
+  }
+  const details = target.closest("details");
+  if (details) {
+    details.open = true;
+  }
+  target.scrollIntoView();
+}
+
+// The footer's provenance line and the build's store path, and the pool
+// sizes the buttons and the methods name, from the data file itself.
 function showProvenance() {
   const n = data.nixpkgs;
   const mv = data.multiverse;
-  const rev = `<a href="https://github.com/NixOS/nixpkgs/tree/${n.rev}"><code>${n.rev.slice(0, 12)}</code></a>`;
+  const rev = `<a href="${NIXPKGS_TREE_URL}${n.rev}"><code>${n.rev.slice(0, SHORT_REV)}</code></a>`;
+  const years = `${mv.first.slice(0, 4)}–${mv.last.slice(0, 4)}`;
   $("provenance").innerHTML =
-    `Rebuild counts and closures: nixpkgs ${rev} ` +
-    `(${n.date}), ${data.system}, counted over ${formatCount(data.graph.universe)} packages. ` +
-    `Versions and first-seen dates: <a href="https://nixmultiverse.com/">nixpkgs-multiverse</a>, ` +
-    `${formatCount(mv.revisions)} nixos-unstable revisions from ${monthYear(mv.first)} to ${monthYear(mv.last)}.`;
-  for (const node of document.querySelectorAll(".nixpkgs-rev")) {
-    node.textContent = n.rev;
+    `nixpkgs ${rev} (${n.date}), ${data.system}. ` +
+    `Versions: <a href="${MULTIVERSE_URL}">nixpkgs-multiverse</a>, ${years}.`;
+
+  // The store path, once the site build has filled it in.
+  if (!STORE_PATH.startsWith(PLACEHOLDER_PREFIX)) {
+    $("store-path").textContent = STORE_PATH;
+    $("store").hidden = false;
   }
+
+  // The pool sizes: deep cuts is the packages beyond the common pool.
   for (const node of document.querySelectorAll(".tier-common")) {
     node.textContent = formatCount(data.tiers.common);
   }
   for (const node of document.querySelectorAll(".tier-deep")) {
-    node.textContent = formatCount(data.tiers.deep);
+    node.textContent = formatCount(data.tiers.deep - data.tiers.common);
   }
 }
 
@@ -320,15 +233,15 @@ function bind() {
     .querySelectorAll(".card")
     .forEach((card, i) => card.addEventListener("click", () => pick(i)));
   $("next").addEventListener("click", next);
-  $("copy").addEventListener("click", () =>
-    copyText($("copy"), $("share").value, () => $("share").select()),
-  );
-  window.addEventListener("hashchange", () => setMode(location.hash.slice(1)));
+  for (const button of document.querySelectorAll("#pools button")) {
+    button.addEventListener("click", () => setPool(button.dataset.pool));
+  }
+  window.addEventListener("hashchange", showSection);
 
   // 1 or the left arrow picks the left card, 2 or the right arrow the
   // right one; Enter moves on once the numbers are shown.
   document.addEventListener("keydown", (e) => {
-    if (e.altKey || e.ctrlKey || e.metaKey || e.target.tagName === "TEXTAREA") {
+    if (e.altKey || e.ctrlKey || e.metaKey) {
       return;
     }
     if (round && round.picked === null) {
@@ -348,6 +261,7 @@ function bind() {
 
 async function main() {
   bind();
+  showSection();
   try {
     data = await loadData();
   } catch (e) {
@@ -356,7 +270,7 @@ async function main() {
     return;
   }
   showProvenance();
-  setMode(location.hash.slice(1));
+  setPool(load(POOL_KEY));
 }
 
 main();
