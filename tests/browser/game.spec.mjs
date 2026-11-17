@@ -1,10 +1,12 @@
-// Tests the built page in Chromium: what a reveal shows for each kind of
-// round, that the methods link on a rebuild round leaves the game alone,
-// that the pool choice survives a reload, and that a phone-width page
-// never scrolls sideways. Rounds are random, so each test answers rounds
-// until the one it needs comes up.
+// Tests the built page in Chromium: what each kind of revealed number
+// links to or does when clicked, that navigating to a methods section
+// leaves the game alone, that the pool choice survives a reload, and
+// that a phone-width page never scrolls sideways. Rounds are random, so
+// each test answers rounds until the one it needs comes up.
 
 import { test, expect } from "@playwright/test";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 
 // How each kind of round's question reads on the page.
 const QUESTION = {
@@ -19,8 +21,19 @@ const MAX_ROUNDS = 80;
 
 const PHONE = { width: 390, height: 844 };
 
-const CACHE_URL = "https://cache.nixos.org";
+const STORE = "/nix/store/";
+const NARINFO_ROUTE = "https://cache.nixos.org/*.narinfo";
 const MULTIVERSE_PKG_URL = "https://nixmultiverse.com/?pkg=";
+const NIXPKGS_COMMIT_URL = "https://github.com/NixOS/nixpkgs/commit/";
+const HTTP_NOT_FOUND = 404;
+
+// The common pool as the built site ships it, read from the tree under
+// test: the closure tests answer narinfo requests from it.
+function commonPackages() {
+  const root = process.env.SITE_ROOT;
+  const file = readdirSync(root).find((name) => /^game\.[0-9a-f]+\.json$/.test(name));
+  return JSON.parse(readFileSync(join(root, file))).packages;
+}
 
 // Answers rounds until a round of `type` for which `wanted(page)` holds
 // is revealed. The first card is always the pick; right or wrong, the
@@ -29,8 +42,8 @@ async function revealRound(page, type, wanted = async () => true) {
   await expect(page.locator("#question")).not.toBeEmpty();
   for (let i = 0; i < MAX_ROUNDS; i++) {
     const question = await page.locator("#question").textContent();
-    await page.locator(".card").first().click();
-    await expect(page.locator("#proofs")).toBeVisible();
+    await page.locator(".card .pick").first().click();
+    await expect(page.locator("#after")).toBeVisible();
     if (QUESTION[type].test(question) && (await wanted(page))) {
       return;
     }
@@ -48,23 +61,23 @@ async function gameState(page) {
   };
 }
 
-// Tests the bug where the methods link under a rebuild round's witness
-// switched the game mode: after the click the same round is on screen,
-// answered, and the rebuild-count methods are open and in view.
-test("the methods link keeps the round and shows the rebuild methods", async ({ page }) => {
+// Tests the bug where following a link to the methods switched the game
+// mode: after navigating to the rebuild-count section the same answered
+// round is on screen, and the section is open and in view.
+test("a methods fragment keeps the round and shows the section", async ({ page }) => {
   await page.goto("/");
-  const link = page.getByRole("link", { name: "How the full count was made" }).first();
-  await revealRound(page, "rebuilds", async () => (await link.count()) > 0);
+  await revealRound(page, "rebuilds");
   const before = await gameState(page);
 
-  await link.click();
+  await page.evaluate(() => {
+    location.hash = "#how-rebuilds";
+  });
 
-  // Let the fragment navigation and any hashchange handler run before
-  // looking at the game.
-  await page.waitForFunction(() => location.hash !== "");
+  // Let the hashchange handler run before looking at the game.
+  await page.waitForFunction(() => location.hash === "#how-rebuilds");
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => resolve())));
 
-  await expect(page.locator("#proofs")).toBeVisible();
+  await expect(page.locator("#after")).toBeVisible();
   expect(await gameState(page)).toEqual(before);
   await expect(page.locator("#help")).toHaveAttribute("open", "");
   await expect(page.locator("#how-rebuilds")).toBeInViewport();
@@ -90,37 +103,84 @@ test("the pool choice survives a reload", async ({ page }) => {
   );
 });
 
-// Tests a closure round's reveal: the store path, the path-info command
-// and the live check stay, the printed expected output is gone, and no
-// copy buttons remain.
-test("a closure reveal shows the command and the live check only", async ({ page }) => {
+// Tests that a versions or age number links to its package on the
+// multiverse, and that no proof panel or copy button is left.
+for (const type of ["versions", "firstSeen"]) {
+  test(`a ${type} number links to the multiverse`, async ({ page }) => {
+    await page.goto("/");
+    await revealRound(page, type);
+    for (const card of await page.locator(".card").all()) {
+      const attr = await card.locator(".attr").textContent();
+      await expect(card.locator(".stat a")).toHaveAttribute(
+        "href",
+        MULTIVERSE_PKG_URL + encodeURIComponent(attr),
+      );
+    }
+    await expect(page.locator("#proofs")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Copy" })).toHaveCount(0);
+  });
+}
+
+// Tests the inline live check on a closure number: with cache.nixos.org
+// answering each root with its recorded size and no references, the
+// line beside the number reports a match.
+test("a closure number checks itself against the cache", async ({ page }) => {
+  const sizeByHash = new Map(
+    commonPackages().map((p) => [p.out.slice(STORE.length).split("-", 1)[0], p.closureSize]),
+  );
+  await page.route(NARINFO_ROUTE, (route) => {
+    const hash = new URL(route.request().url()).pathname.slice(1).split(".", 1)[0];
+    route.fulfill({
+      headers: { "access-control-allow-origin": "*" },
+      contentType: "text/x-nix-narinfo",
+      body: `StorePath: ${STORE}${hash}-x\nNarSize: ${sizeByHash.get(hash)}\nReferences: \n`,
+    });
+  });
+
   await page.goto("/");
   await revealRound(page, "closureSize");
-  const proofs = page.locator("#proofs");
-  await expect(proofs).toContainText(`nix path-info -S --store ${CACHE_URL} /nix/store/`);
-  await expect(page.getByRole("button", { name: "Check it live" })).toHaveCount(2);
-  await expect(proofs.locator(".output")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Copy" })).toHaveCount(0);
+  const card = page.locator(".card").first();
+  await card.locator(".stat button").click();
+  await expect(card.locator(".note")).toHaveText(/^cache\.nixos\.org: 1 path, .+, matches$/);
 });
 
-// Tests a versions round's reveal: one multiverse link per package and
-// no mvs command or output.
-test("a versions reveal links each package on the multiverse", async ({ page }) => {
+// Tests that a closure walk the cache cannot finish says so beside the
+// number rather than reporting a smaller total.
+test("a closure check reports a path the cache lacks", async ({ page }) => {
+  await page.route(NARINFO_ROUTE, (route) =>
+    route.fulfill({ status: HTTP_NOT_FOUND, headers: { "access-control-allow-origin": "*" } }),
+  );
   await page.goto("/");
-  await revealRound(page, "versions");
-  const proofs = page.locator("#proofs");
-  await expect(proofs.locator(`a[href^="${MULTIVERSE_PKG_URL}"]`)).toHaveCount(2);
-  await expect(proofs).not.toContainText("mvs");
-  await expect(page.getByRole("button", { name: "Copy" })).toHaveCount(0);
+  await revealRound(page, "closureSize");
+  const card = page.locator(".card").first();
+  await card.locator(".stat button").click();
+  await expect(card.locator(".note")).toContainText("is not in https://cache.nixos.org");
 });
 
-// Tests that the footer names the store path the page was built into.
-test("the footer shows the site's store path", async ({ page }) => {
+// Tests that a rebuild count with dependents opens a line naming some of
+// them, and that a count of zero is plain text.
+test("a rebuild number names some dependents", async ({ page }) => {
+  await page.goto("/");
+  await revealRound(page, "rebuilds");
+  for (const card of await page.locator(".card").all()) {
+    const stat = await card.locator(".stat").textContent();
+    if (stat.startsWith("0 ")) {
+      await expect(card.locator(".stat button")).toHaveCount(0);
+      continue;
+    }
+    await card.locator(".stat button").click();
+    await expect(card.locator(".note")).toHaveText(/^includes \S/);
+  }
+});
+
+// Tests the footer: the nixpkgs commit link and the store path the page
+// was built into.
+test("the footer names the commit and the site's store path", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveTitle("nixpkgs higher or lower");
-  await expect(page.locator("footer")).toContainText(
-    /\/nix\/store\/[0-9a-z]{32}-nixpkgs-higher-lower-site/,
-  );
+  const footer = page.locator("footer");
+  await expect(footer.locator(`a[href^="${NIXPKGS_COMMIT_URL}"]`)).toHaveCount(1);
+  await expect(footer).toContainText(/\/nix\/store\/[0-9a-z]{32}-nixpkgs-higher-lower-site/);
 });
 
 // Tests at phone width that no reveal makes the page wider than the
