@@ -1,0 +1,56 @@
+# Top-level packages the name rules in tools/rhl/pool.py let through but
+# nobody would recognise as a package of their own: build plumbing named
+# like an ordinary package. One attribute per line, with the reason.
+
+# setup hooks and build helpers named like packages
+addDriverRunpath
+auto-patchelf
+buildcatrust
+copyDesktopItems
+copyPkgconfigItems
+deterministic-uname
+expand-response-params
+findXMLCatalogs
+gnu-config
+installFonts
+installShellFiles
+jre-generate-cacerts
+libredirect
+nodejsInstallExecutables
+nodejsInstallManuals
+nukeReferences
+pnpm-fixup-state-db
+prefetch-npm-deps
+pruneLibtoolFiles
+removeReferencesTo
+setJavaClassPath
+setupDebugInfoDirs
+validatePkgConfig
+
+# the cc-wrapper's binutils half; binutils itself stays
+bintools
+
+# headers and stubs split out of a package that is already in the pool
+bluez-headers
+dri-pkgconfig-stub
+mesa-gl-headers
+libsystemtap
+systemtap-sdt
+
+# variants of a package already in the pool
+bashFHS
+glibcLocalesUtf8
+hostname-debian
+w3m-batch
+
+# DocBook DTDs, one per version, which only the docs toolchain knows
+docbook_sgml_dtd_41
+docbook_xml_dtd_412
+docbook_xml_dtd_42
+docbook_xml_dtd_43
+docbook_xml_dtd_44
+docbook_xml_dtd_45
+docbook-xsl-ns
+
+# a Rust crate built on its own for rustc, not a package
+rust-jemalloc-sys
