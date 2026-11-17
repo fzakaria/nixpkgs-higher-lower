@@ -91,9 +91,6 @@ h2 {
 a {
   color: var(--accent);
 }
-.lede {
-  font-weight: 600;
-}
 code,
 kbd {
   font:
@@ -145,25 +142,37 @@ button {
     justify-self: center;
   }
 }
+/* A card is the pick button above the revealed number and its note.
+   The card draws the border, so the button inside is bare. */
 .card {
-  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
   min-height: 11rem;
-  padding: 1rem;
-  text-align: left;
   background: var(--card-bg);
   border: 1px solid var(--line);
   border-radius: 6px;
+}
+.card:has(.pick:hover:enabled),
+.card:has(.pick:focus-visible) {
+  border-color: var(--accent);
+}
+.pick {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 1rem 1rem 0.3rem;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 6px;
   cursor: pointer;
 }
-.card:hover:enabled,
-.card:focus-visible {
-  border-color: var(--accent);
+.pick:focus-visible {
   outline: none;
 }
-.card:disabled {
+.pick:disabled {
   cursor: default;
 }
 .card .attr {
@@ -182,9 +191,42 @@ button {
   color: var(--muted);
 }
 .card .stat {
+  padding: 0 1rem;
   font-size: 1.3rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+.card .note {
+  padding: 0 1rem 0.8rem;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+/* The revealed number: the same dotted underline on every kind of round,
+   whether it is a link or a button. */
+.answer {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline dotted;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+.answer:hover {
+  text-decoration-style: solid;
+}
+.answer:disabled {
+  cursor: progress;
+}
+.note.right {
+  color: var(--right);
+}
+.note.wrong,
+.note.error {
+  color: var(--wrong);
 }
 
 /* After a pick: the higher card is outlined, the picked one coloured. */
@@ -205,73 +247,6 @@ button {
   color: var(--wrong);
 }
 
-/* The proofs under the cards: one column per card, stacked on a phone. */
-#proofs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.8rem;
-}
-@media (max-width: 40rem) {
-  #proofs {
-    grid-template-columns: 1fr;
-  }
-}
-.proof {
-  min-width: 0;
-  font-size: 14px;
-}
-.proof h3 {
-  font-size: 0.95rem;
-  margin: 0 0 0.3rem;
-}
-.proof p {
-  margin: 0.4rem 0;
-}
-.proof .path code {
-  overflow-wrap: anywhere;
-}
-pre {
-  margin: 0;
-  font:
-    12px/1.5 ui-monospace,
-    monospace;
-  background: var(--code-bg);
-  border-radius: 4px;
-  padding: 0.4rem 0.5rem;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-/* A command's code sits in its box, without the inline code chip. */
-pre code {
-  font: inherit;
-  background: none;
-  padding: 0;
-}
-.check {
-  padding: 0.2rem 0.6rem;
-  background: none;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-}
-.check:hover:enabled {
-  border-color: var(--accent);
-}
-.check-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: baseline;
-  margin-top: 0.5rem;
-}
-.live.right {
-  color: var(--right);
-}
-.live.wrong,
-.live.error {
-  color: var(--wrong);
-}
 #after {
   display: flex;
   align-items: center;

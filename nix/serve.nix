@@ -25,8 +25,10 @@ pkgs.writeShellScript "serve-site" ''
           super().end_headers()
 
   http.server.SimpleHTTPRequestHandler.extensions_map[".js"] = "text/javascript"
+  # Loopback only: a preview server has no business on the network.
+  HOST = "127.0.0.1"
   port = int(sys.argv[1])
-  print(f"serving on http://127.0.0.1:{port}/ (site={SITE})", flush=True)
-  http.server.ThreadingHTTPServer(("", port), Handler).serve_forever()
+  print(f"serving on http://{HOST}:{port}/ (site={SITE})", flush=True)
+  http.server.ThreadingHTTPServer((HOST, port), Handler).serve_forever()
   EOF
 ''

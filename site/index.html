@@ -38,11 +38,7 @@
       </nav>
     </header>
 
-    <p class="intro">
-      <strong class="lede">Two nixpkgs packages. Pick the higher one.</strong>
-      Rounds ask about rebuild count, closure size, version count or age, and run until your first
-      wrong answer. Each reveal shows how to check the number.
-    </p>
+    <p class="intro">Pick the higher one. One wrong answer ends the run.</p>
 
     <nav id="pools" class="tabs" aria-label="Pool">
       <button type="button" data-pool="common" aria-pressed="true">
@@ -58,27 +54,32 @@
     <section id="game" hidden>
       <h2 id="question"></h2>
       <div id="cards">
-        <button class="card" type="button">
-          <span class="key">1</span>
-          <code class="attr"></code>
-          <span class="version muted"></span>
-          <span class="desc"></span>
-          <span class="stat" aria-live="polite"></span>
-        </button>
+        <div class="card">
+          <button class="pick" type="button">
+            <span class="key">1</span>
+            <code class="attr"></code>
+            <span class="version muted"></span>
+            <span class="desc"></span>
+          </button>
+          <div class="stat" aria-live="polite"></div>
+          <div class="note muted" aria-live="polite"></div>
+        </div>
         <span class="or muted">or</span>
-        <button class="card" type="button">
-          <span class="key">2</span>
-          <code class="attr"></code>
-          <span class="version muted"></span>
-          <span class="desc"></span>
-          <span class="stat" aria-live="polite"></span>
-        </button>
+        <div class="card">
+          <button class="pick" type="button">
+            <span class="key">2</span>
+            <code class="attr"></code>
+            <span class="version muted"></span>
+            <span class="desc"></span>
+          </button>
+          <div class="stat" aria-live="polite"></div>
+          <div class="note muted" aria-live="polite"></div>
+        </div>
       </div>
       <div id="after" hidden>
         <span id="verdict"></span>
         <button id="next" type="button">Next</button>
       </div>
-      <div id="proofs" hidden></div>
     </section>
 
     <details id="help">
@@ -87,22 +88,21 @@
         <strong>Rebuilds</strong>: nixpkgs was evaluated for x86_64-linux with
         <a href="https://github.com/nix-community/nix-eval-jobs">nix-eval-jobs</a>, covering what
         <code>nix-env -qa</code> lists. A package's count is how many of those packages have its
-        <code>.drv</code> in their build closure. No command prints the count, so each reveal names one
-        dependent and the <code>nix why-depends</code> command that links them.
+        <code>.drv</code> in their build closure. Click a count to see a few of them.
         <a href="https://github.com/fzakaria/nixpkgs-higher-lower/blob/main/docs/data.md">docs/data.md</a>
         has the full method.
       </p>
       <p id="how-closure">
         <strong>Closure size</strong>: the sum of <code>NarSize</code> over the runtime closure of the
         package's default output on cache.nixos.org, which is what <code>nix path-info -S</code> prints.
-        "Check it live" repeats the walk from the page.
+        Click a size to repeat the walk from the page.
       </p>
       <p id="how-history">
         <strong>Versions and age</strong>: from
         <a href="https://nixmultiverse.com/">nixpkgs-multiverse</a>, which records every version at each
         nixos-unstable channel bump since 2012. It has no bumps from October 2013 to September 2016, so
         a package added then has a three-year window. Two packages are compared only when their windows
-        are six months apart or more.
+        are six months apart or more. Click a number to see the package's history.
       </p>
       <p id="how-pools">
         <strong>Pools</strong>: Common is the <span class="tier-common"></span> packages with the most

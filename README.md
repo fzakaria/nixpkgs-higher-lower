@@ -11,11 +11,11 @@ shipped more versions, and which was packaged first. The game runs until
 the first wrong answer, on a common pool of 1,000 packages or on 9,000
 deep cuts.
 
-After each answer both cards show how to check the number: a
-`nix why-depends --derivation` command from a package that depends on it,
-the store path and `nix path-info -S` for closures, or the package's
-history on nixmultiverse.com. Closure sizes can also be re-walked from the
-page against cache.nixos.org.
+After each answer, each revealed number can be clicked to check it. A
+version count or first-seen date links to the package's history on
+nixmultiverse.com. A closure size re-walks the closure against
+cache.nixos.org from the page. A rebuild count names a few of the
+packages it counts.
 
 Everything is precomputed into JSON shipped with the page. Nothing runs
 on a server.
@@ -36,8 +36,8 @@ on a server.
    [nixpkgs-multiverse](https://nixmultiverse.com/)'s `index/history.json`,
    also pinned in `flake.lock`.
 5. Runtime closure sizes are summed from cache.nixos.org's narinfos.
-6. Each package gets a witness: the best-known package that has it in its
-   build closure, for the `nix why-depends` command.
+6. Each package names its first three dependents, best known first, for
+   the line under its rebuild count.
 
 [docs/data.md](docs/data.md) has the details, what each step costs, and
 why the result is committed rather than built in CI.
@@ -46,8 +46,9 @@ why the result is committed rather than built in CI.
 
 `site/` is the static page: vanilla ES modules, no bundler, no
 dependencies. `site/js/game.js` holds the rules (which pairs are fair,
-who wins) and `site/js/verify.js` the proofs (commands, the live narinfo
-walk), neither touching the DOM. `tools/rhl/` is
+who wins) and `site/js/verify.js` the checks (the multiverse link, the
+live narinfo walk), neither touching the DOM. `site/js/answer.js` makes
+a revealed number clickable. `tools/rhl/` is
 the data pipeline in Python, and `tools/eval-drvs.sh` the evaluation it
 starts from. `data/game.json` and `data/deep.json` are the pipeline's
 output. `nix/` holds the

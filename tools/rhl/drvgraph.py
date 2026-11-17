@@ -92,9 +92,7 @@ def reverse_closure_counts(graph, universe, targets, chunk=DEFAULT_CHUNK):
     return counts
 
 
-def reverse_closures(
-    graph, universe, targets, chunk=DEFAULT_CHUNK, examples=1, block=COUNT_ROWS
-):
+def reverse_closures(graph, universe, targets, chunk=DEFAULT_CHUNK, examples=1, block=COUNT_ROWS):
     """({target: count}, {target: [first dependents]}).
 
     The count is how many members of `universe` (not counting the target

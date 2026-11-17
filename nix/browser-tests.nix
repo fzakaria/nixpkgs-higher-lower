@@ -1,7 +1,8 @@
 # The browser suite: tests/browser/*.spec.mjs, run by Playwright's
 # Chromium against the built site on a loopback port inside the build
-# sandbox. Nothing it loads leaves the machine; the only network the page
-# uses is the "Check it live" walk, which the suite never clicks.
+# sandbox. Nothing it loads leaves the machine: the live closure walk is
+# the only network the page uses, and the suite answers its narinfo
+# requests itself.
 { pkgs, site }:
 pkgs.runCommand "nixpkgs-higher-lower-browser-tests"
   {

@@ -4,9 +4,9 @@
 // picked, and the choice is remembered.
 
 import { loadData, loadDeep } from "./data.js";
-import { formatCount, formatStat } from "./format.js";
+import { showAnswer } from "./answer.js";
+import { formatCount } from "./format.js";
 import { QUESTIONS, drawPair, randomType, winner } from "./game.js";
-import { proofPanel } from "./proof.js";
 
 // The game keeps this many recent packages out of the next draws.
 const RECENT_LIMIT = 40;
@@ -23,8 +23,7 @@ const BEST_KEY = { [POOLS.common]: "nhl-best-common", [POOLS.deep]: "nhl-best-de
 const STORE_PATH = "__STORE_PATH__";
 const PLACEHOLDER_PREFIX = "__";
 
-const NIXPKGS_TREE_URL = "https://github.com/NixOS/nixpkgs/tree/";
-const MULTIVERSE_URL = "https://nixmultiverse.com/";
+const NIXPKGS_COMMIT_URL = "https://github.com/NixOS/nixpkgs/commit/";
 
 // How many characters of the nixpkgs revision the footer shows.
 const SHORT_REV = 7;
@@ -63,14 +62,16 @@ function save(key, value) {
   }
 }
 
-// Draw one card's static content: the name, version and description.
+// Draw one card's static content: the name, version and description,
+// with the number and its note cleared.
 function fillCard(card, p) {
   card.querySelector(".attr").textContent = p.attr;
   card.querySelector(".version").textContent = p.version ?? "";
   card.querySelector(".desc").textContent = p.description ?? "";
-  card.querySelector(".stat").textContent = "";
+  card.querySelector(".stat").replaceChildren();
+  card.querySelector(".note").textContent = "";
   card.classList.remove("right", "wrong", "higher");
-  card.disabled = false;
+  card.querySelector(".pick").disabled = false;
 }
 
 function showRound() {
@@ -78,15 +79,12 @@ function showRound() {
   const cards = document.querySelectorAll(".card");
   fillCard(cards[0], round.a);
   fillCard(cards[1], round.b);
-  $("proofs").replaceChildren();
-  $("proofs").hidden = true;
   $("after").hidden = true;
   $("game").hidden = false;
-  cards[0].focus({ preventScroll: true });
+  cards[0].querySelector(".pick").focus({ preventScroll: true });
 }
 
-// Reveal both numbers and their proofs, mark the answer, and update the
-// streak.
+// Reveal both numbers, mark the answer, and update the streak.
 function pick(side) {
   if (!round || round.picked !== null) {
     return;
@@ -95,22 +93,17 @@ function pick(side) {
   const answer = winner(round.type, round.a, round.b);
   const right = side === answer;
 
-  // Both stats, the higher card outlined, the picked card coloured, and
-  // under them how to check each number.
+  // Both numbers, each clickable to check it, the higher card outlined
+  // and the picked card coloured.
   const cards = document.querySelectorAll(".card");
   [round.a, round.b].forEach((p, i) => {
-    cards[i].querySelector(".stat").textContent = formatStat(round.type, p);
-    cards[i].disabled = true;
+    showAnswer(round.type, p, cards[i].querySelector(".stat"), cards[i].querySelector(".note"));
+    cards[i].querySelector(".pick").disabled = true;
   });
   cards[answer].classList.add("higher");
   cards[side].classList.add(right ? "right" : "wrong");
   $("verdict").textContent = right ? "Right." : "Wrong.";
   $("verdict").className = right ? "right" : "wrong";
-  $("proofs").replaceChildren(
-    proofPanel(round.type, round.a, data),
-    proofPanel(round.type, round.b, data),
-  );
-  $("proofs").hidden = false;
 
   // The streak, kept per pool.
   game.streak = right ? game.streak + 1 : 0;
@@ -202,16 +195,14 @@ function showSection() {
   target.scrollIntoView();
 }
 
-// The footer's provenance line and the build's store path, and the pool
+// The footer's nixpkgs commit and the build's store path, and the pool
 // sizes the buttons and the methods name, from the data file itself.
 function showProvenance() {
   const n = data.nixpkgs;
-  const mv = data.multiverse;
-  const rev = `<a href="${NIXPKGS_TREE_URL}${n.rev}"><code>${n.rev.slice(0, SHORT_REV)}</code></a>`;
-  const years = `${mv.first.slice(0, 4)}–${mv.last.slice(0, 4)}`;
-  $("provenance").innerHTML =
-    `nixpkgs ${rev} (${n.date}), ${data.system}. ` +
-    `Versions: <a href="${MULTIVERSE_URL}">nixpkgs-multiverse</a>, ${years}.`;
+  const rev = document.createElement("a");
+  rev.href = NIXPKGS_COMMIT_URL + n.rev;
+  rev.textContent = n.rev.slice(0, SHORT_REV);
+  $("provenance").replaceChildren("nixpkgs ", rev, ` · ${n.date}`);
 
   // The store path, once the site build has filled it in.
   if (!STORE_PATH.startsWith(PLACEHOLDER_PREFIX)) {
@@ -230,8 +221,8 @@ function showProvenance() {
 
 function bind() {
   document
-    .querySelectorAll(".card")
-    .forEach((card, i) => card.addEventListener("click", () => pick(i)));
+    .querySelectorAll(".card .pick")
+    .forEach((button, i) => button.addEventListener("click", () => pick(i)));
   $("next").addEventListener("click", next);
   for (const button of document.querySelectorAll("#pools button")) {
     button.addEventListener("click", () => setPool(button.dataset.pool));

@@ -5,14 +5,14 @@ Everything the page knows is in two files written by
 nixpkgs-multiverse, both in `flake.lock`:
 
 - `data/game.json`: the common pool of 1,000 packages, and the
-  provenance the footer shows (both revisions, the graph's size, the tier
-  sizes). 298 KB, 83 KB gzipped.
+  provenance the page reads (both revisions, the graph's size, the tier
+  sizes). 323 KB, 86 KB gzipped.
 - `data/deep.json`: the 9,000 packages of the deep-cuts pool, fetched
-  only when a player picks it. 2.7 MB, 779 KB gzipped.
+  only when a player picks it. 2.8 MB, 805 KB gzipped.
 
-Each package carries its store path, its four stats, and a witness for
-its rebuild count, so the page can show how to check every number it
-reveals.
+Each package carries its store path, its four stats, and up to three
+named dependents, so every number the page reveals can be checked from
+the page.
 
 ## Rebuild counts
 
@@ -69,22 +69,17 @@ uses, so almost everything counts it. stdenv's shell is
 `bashNonInteractive` (89,061), so `bash`, the interactive build, counts
 only the 55,075 packages that ask for it by name.
 
-### Witnesses
+### Named dependents
 
-No command prints a rebuild count, so each package names one package that
-depends on it, and the page shows
-`nix why-depends --derivation github:NixOS/nixpkgs/<rev>#<witness> github:NixOS/nixpkgs/<rev>#<attr>`.
-The witness is the first dependent in a preference order: the allow list
-in file order (browsers first, so `firefox` is the witness for 568 of the
-common pool), then the common pool and the deep-cuts pool in rank
-order, then everything else evaluated. The preferred ones are limited to
-packages cache.nixos.org has, which means Hydra built them: they are
-free, so the nixpkgs flake evaluates them without `allowUnfree`. The same
-bitset pass finds the first set row per column.
-
-The `.drv` paths match: `nix why-depends` on the flake printed the same
-`libndp` and `vscodium` derivations the evaluation produced, and the chain
-`vscodium -> libei -> python3-env -> python-dbusmock -> networkmanager -> libndp`.
+Clicking a revealed rebuild count names a few of the packages it counts:
+"includes firefox, libreoffice, steam and 9,647 others". Each package
+carries the first three dependents in a preference order: the allow list
+one section at a time (a browser, then an editor, then a terminal, and
+so on round the sections, so the names are not all browsers), then the
+common pool and the deep-cuts pool in rank order, then everything else
+evaluated. The same bitset pass that counts finds the first three set
+rows per column, which took 2.8 s for the 10,000 packages. The names add
+25 KB to `game.json` and 98 KB to `deep.json`, before compression.
 
 ## The pools
 
@@ -141,8 +136,8 @@ in a closure round. Five sizes (`hello`, `git`, `python3`, `firefox`,
 `glibc`) were checked against `nix path-info -S --store
 https://cache.nixos.org` and matched to the byte.
 
-The page repeats the walk in the browser ("Check it live",
-`site/js/verify.js`): cache.nixos.org sends
+Clicking a revealed closure size repeats the walk in the browser
+(`site/js/verify.js`): cache.nixos.org sends
 `access-control-allow-origin: *`, so the page fetches the root narinfo,
 follows `References` breadth-first with eight requests in flight, and
 compares the sum. `tests/site/live.test.mjs` runs the same code against
@@ -178,7 +173,7 @@ its own Nix jobs:
 | reading 272,243 `.drv` files           | 11 s              |
 | counting rebuilds, 23,895 targets      | 24 s              |
 | walking 25,063 narinfos, cold          | 45 s              |
-| picking witnesses, 10,000 targets      | 10 s              |
+| naming dependents, 10,000 targets      | 3 s               |
 
 The two evaluation times are two runs of the same command; the second
 ran while the machine was shared, and the cause of the gap was not

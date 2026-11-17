@@ -1,6 +1,6 @@
 // Tests the committed data/game.json and data/deep.json against what the
-// page needs: the schema data.js accepts, the proof fields every reveal
-// shows, a value for every question on most packages, and a steady
+// page needs: the schema data.js accepts, what each revealed number
+// links to, a value for every question on most packages, and a steady
 // supply of fair pairs from each pool. Reads the real files, so a data
 // refresh that starves a question fails here rather than on the page.
 
@@ -15,6 +15,9 @@ import { seeded } from "./random.mjs";
 const read = (name) => JSON.parse(readFileSync(new URL(`../../data/${name}`, import.meta.url)));
 const DATA = read("game.json");
 const DEEP = read("deep.json");
+
+// How many dependents tools/rhl/build.py names per package.
+const DEPENDENT_EXAMPLES = 3;
 
 // How many recent packages the page keeps out of the next draws, as in
 // site/js/app.js.
@@ -38,12 +41,15 @@ test("tiers add up", () => {
   assert.ok(DEEP.packages.every((p) => !common.has(p.attr)));
 });
 
-// Tests the proof fields: a store path on every package, and a witness
-// dependent exactly when something depends on the package.
-test("every package carries its proof", () => {
+// Tests what the revealed numbers need: a store path on every package
+// for the live closure walk, and up to DEPENDENT_EXAMPLES named
+// dependents exactly when something depends on the package.
+test("every package carries what its numbers link to", () => {
   for (const p of [...DATA.packages, ...DEEP.packages]) {
     assert.match(p.out, /^\/nix\/store\/[0-9a-z]{32}-/, p.attr);
-    assert.equal(p.witness === null, p.rebuilds === 0, p.attr);
+    assert.ok(p.dependents.length <= DEPENDENT_EXAMPLES, p.attr);
+    assert.ok(p.dependents.length <= p.rebuilds, p.attr);
+    assert.equal(p.dependents.length === 0, p.rebuilds === 0, p.attr);
   }
 });
 

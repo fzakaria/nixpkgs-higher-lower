@@ -99,9 +99,9 @@
                 touch $out
               '';
 
-          # the game's unit tests (pair choice, scoring, the proof
-          # commands, the narinfo walk), and a pass over the committed
-          # data that both pools keep drawing fair pairs
+          # the game's unit tests (pair choice, scoring, number formats,
+          # the narinfo walk), and a pass over the committed data that
+          # both pools keep drawing fair pairs
           site-tests =
             pkgs.runCommand "nixpkgs-higher-lower-site-tests" { nativeBuildInputs = [ pkgs.nodejs ]; }
               ''

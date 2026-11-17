@@ -5,7 +5,7 @@
 // game.json is the common pool plus the provenance the footer shows.
 // deep.json is the deep-cuts pool, fetched only when a player picks it.
 
-export const SCHEMA = 2;
+export const SCHEMA = 3;
 
 export const DATA_URL = "game.json";
 export const DEEP_URL = "deep.json";
@@ -15,7 +15,7 @@ const PACKAGE_FIELDS = [
   "attr",
   "out",
   "rebuilds",
-  "witness",
+  "dependents",
   "closureSize",
   "versions",
   "firstSeen",

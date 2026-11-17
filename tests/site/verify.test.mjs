@@ -1,5 +1,5 @@
-// Tests for site/js/verify.js, which proves a revealed number: the
-// commands a player can run, the multiverse link, and the
+// Tests for site/js/verify.js, which checks a revealed number: the
+// multiverse link, and the
 // in-browser walk of cache.nixos.org's narinfos. The walk is driven by a
 // made-up cache in a Map, so these tests need no network; live.test.mjs
 // runs the same walk against the real cache when asked to.
@@ -7,29 +7,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import {
-  multiverseUrl,
-  narinfoUrl,
-  parseNarinfo,
-  pathInfoCommand,
-  walkClosure,
-  whyDependsCommand,
-} from "../../site/js/verify.js";
+import { multiverseUrl, narinfoUrl, parseNarinfo, walkClosure } from "../../site/js/verify.js";
 
-const REV = "6dadaf4375be35033e1c84395adbd53ff5fded96";
 const LIBNDP = "/nix/store/97q15lk5c0c10miyawwbfir4rddifcqn-libndp-1.9";
 
-// Tests each command and URL against what was run by hand.
-test("commands and links", () => {
-  assert.equal(
-    pathInfoCommand(LIBNDP),
-    `nix path-info -S --store https://cache.nixos.org ${LIBNDP}`,
-  );
-  assert.equal(
-    whyDependsCommand(REV, "vscodium", "libndp"),
-    `nix why-depends --derivation github:NixOS/nixpkgs/${REV}#vscodium github:NixOS/nixpkgs/${REV}#libndp`,
-  );
+// Tests the two URLs a number leads to: the package on the multiverse
+// and a store path's narinfo on the cache.
+test("multiverse and narinfo URLs", () => {
   assert.equal(multiverseUrl("libndp"), "https://nixmultiverse.com/?pkg=libndp");
+  assert.equal(
+    multiverseUrl("python3Packages.foo"),
+    "https://nixmultiverse.com/?pkg=python3Packages.foo",
+  );
   assert.equal(
     narinfoUrl(LIBNDP),
     "https://cache.nixos.org/97q15lk5c0c10miyawwbfir4rddifcqn.narinfo",

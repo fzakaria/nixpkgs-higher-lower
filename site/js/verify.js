@@ -1,7 +1,7 @@
-// Proof for a revealed number: the command that reproduces it, and for
-// closure sizes a walk of cache.nixos.org's narinfos run in the browser.
-// cache.nixos.org answers with `access-control-allow-origin: *`, so a
-// static page can fetch them.
+// Checking a revealed number: the multiverse page behind a version count
+// or a first-seen date, and for closure sizes a walk of cache.nixos.org's
+// narinfos run in the browser. cache.nixos.org answers with
+// `access-control-allow-origin: *`, so a static page can fetch them.
 
 export const CACHE_URL = "https://cache.nixos.org";
 
@@ -11,15 +11,6 @@ const STORE = "/nix/store/";
 export const WALK_CONCURRENCY = 8;
 
 const HTTP_NOT_FOUND = 404;
-
-export function pathInfoCommand(out) {
-  return `nix path-info -S --store ${CACHE_URL} ${out}`;
-}
-
-export function whyDependsCommand(rev, dependent, attr) {
-  const flake = `github:NixOS/nixpkgs/${rev}`;
-  return `nix why-depends --derivation ${flake}#${dependent} ${flake}#${attr}`;
-}
 
 export function multiverseUrl(attr) {
   return `https://nixmultiverse.com/?pkg=${encodeURIComponent(attr)}`;
